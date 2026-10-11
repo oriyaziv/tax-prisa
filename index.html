@@ -67,6 +67,13 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .note{font-size:.85rem;color:var(--muted);margin:0}
 .warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:.9rem}
 .adj{max-width:560px}
+.stack{display:grid;gap:20px}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.mode{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;color:var(--ink)}
+.mode input{width:auto;margin-top:5px;accent-color:var(--accent)}
+.mode b{display:block;font-size:1.05rem}
+.mode small{display:block;color:var(--muted);font-size:.83rem}
+.mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .stat{border:1px solid var(--line);border-radius:8px;padding:12px}
@@ -107,6 +114,19 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
     <h1>מחשבון פריסת מס</h1>
     <p>ייחוס הפרשי שכר, פיצויים או הכנסה חד-פעמית לשנים קודמות. לכל שנה מחושב המס על הסכום המיוחס לפי מדרגות המס, נקודות הזיכוי והזיכויים של אותה שנה. התוצאה היא שיעור מס לניכוי במקור. הנתונים שמופיעים בפתיחה הם דוגמה.</p>
   </header>
+
+  <section class="panel" id="modePanel">
+    <h2>מטרת החישוב</h2>
+    <div class="modes" role="radiogroup">
+      <label class="mode"><input type="radio" name="mode" id="modeCoord" value="coord">
+        <span><b>אישור תיאום מס</b><small>שנה שוטפת 2026 · מקדמת מס וזיכוי מאולץ למערכת השכר</small></span></label>
+      <label class="mode"><input type="radio" name="mode" id="modeAnnual" value="annual">
+        <span><b>דוח שנתי (החזר מס)</b><small>שנות מס 2020–2025 · ייחוס לשנים קודמות והתאמות לשנת הדוח</small></span></label>
+    </div>
+    <p class="note" id="modeHint">בחרו את מטרת החישוב כדי להמשיך.</p>
+  </section>
+
+  <div id="work" class="stack" hidden>
 
   <section class="panel">
     <h2>פרטי התשלום</h2>
@@ -195,6 +215,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
       <div class="stat"><div class="k">מקדמת מס (₪)</div><div class="v" id="rTax"></div></div>
       <div class="stat"><div class="k">סה"כ הכנסה שמיוחסת לשנים קודמות</div><div class="v" id="rPrevInc"></div></div>
       <div class="stat"><div class="k">סה"כ מס שמיוחס לשנים קודמות</div><div class="v" id="rPrevTax"></div></div>
+      <div class="stat" id="statNoSpread"><div class="k">מס ללא פריסה (הכל בשנת הדוח)</div><div class="v" id="rNoSpread"></div></div>
     </div>
     <p class="note" id="payPart" hidden></p>
     <div id="warn" class="warnbox" hidden></div>
@@ -202,8 +223,8 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
     <span id="pdfMsg" role="status" class="note"></span>
   </section>
 
-  <section class="panel">
-    <h2>אישור לשנה שוטפת</h2>
+  <section class="panel" id="certPanel">
+    <h2>אישור תיאום מס – 2026</h2>
     <p class="note">מערכת השכר מחשבת את התשלום כהכנסה רגילה של השנה השוטפת. הזיכוי המאולץ הוא הפער בין המס שהמערכת תחשב לבין המס לפי הפריסה. ההכנסה השוטפת נלקחת מהשורה של שנת התשלום בטבלה.</p>
     <div class="summary">
       <div class="stat"><div class="k">סך הסכום שנפרס</div><div class="v" id="cTotal"></div></div>
@@ -211,10 +232,10 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
       <div class="stat"><div class="k">מקדמת מס לפי הפריסה</div><div class="v" id="cDue"></div></div>
       <div class="stat key"><div class="k">זיכוי מאולץ (₪)</div><div class="v" id="cForced"></div></div>
     </div>
-    <div class="actions"><button id="pdfCert" type="button" class="primary">PDF – אישור לשנה שוטפת</button></div>
+    <div class="actions"><button id="pdfCert" type="button" class="primary">PDF – אישור תיאום מס</button></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="refundPanel">
     <h2>דוח החזר מס – שנת הדוח <span id="rfYear"></span></h2>
     <p class="note">ההכנסה והמס שמיוחסים לשנים קודמות מופחתים מההכנסה ומהמס שנוכה בשנת הדוח. אם השדות נשארים ריקים, השורות ב-PDF יישארו למילוי ידני.</p>
     <div class="grid">
@@ -231,6 +252,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
     </table></div>
     <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
   </section>
+  </div>
 
 </div>
 
@@ -257,6 +279,7 @@ const TYPE_NOTE = {
 
 // ---- state ----
 const state = {
+  mode: null,  // 'coord' (tax coordination, 2026) | 'annual' (annual report, 2020-2025)
   type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
   profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
   refund: { inc106: null, tax106: null },
@@ -355,6 +378,7 @@ function calc() {
   $('payPart').hidden = !cur;
   if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
   $('rTax').textContent = ils(r.sumTax);
+  $('rNoSpread').textContent = ils(r.noSpread);
   // current-year certificate
   $('cTotal').textContent = ils(r.sumAlloc);
   $('cSystem').textContent = ils(r.noSpread);
@@ -371,14 +395,16 @@ function calc() {
   const warns = [];
   const missing = input.lines.filter(l => l.year !== state.payYear && yd(l.year).base == null).map(l => l.year);
   if (missing.length) warns.push(`בשנים ${missing.join(', ')} לא הוזנה הכנסה חייבת. החישוב מניח 0. אם באמת לא הייתה הכנסה, הזינו 0.`);
-  if (yd(state.payYear).base == null) warns.push(`לא הוזנה הכנסה חייבת לשנת התשלום ${state.payYear}. היא נדרשת לחישוב הזיכוי המאולץ באישור לשנה שוטפת.`);
-  if (r.forcedCredit < 0) warns.push(`המס לפי הפריסה (${ils(r.sumTax)}) גבוה מהמס בלי פריסה (${ils(r.noSpread)}). הפריסה אינה מקטינה את המס, ולכן אין זיכוי מאולץ.`);
+  if (yd(state.payYear).base == null) warns.push(state.mode === 'coord'
+    ? `לא הוזנה הכנסה חייבת לשנת ${state.payYear}. היא נדרשת לחישוב הזיכוי המאולץ.`
+    : `לא הוזנה הכנסה חייבת לשנת הדוח ${state.payYear}. היא נדרשת להשוואה למס ללא פריסה.`);
+  if (state.mode === 'coord' && r.forcedCredit < 0) warns.push(`המס לפי הפריסה (${ils(r.sumTax)}) גבוה מהמס בלי פריסה (${ils(r.noSpread)}). הפריסה אינה מקטינה את המס, ולכן אין זיכוי מאולץ.`);
+  if (state.type === 'severance' && state.payYear - state.sevYears + 1 < E.MIN_YEAR)
+    warns.push(`החלקים של השנים שלפני ${E.MIN_YEAR} לא נפרסים, ונוספו לשנת התשלום ${state.payYear}.`);
   $('warn').hidden = !warns.length;
   $('warn').innerHTML = warns.map(esc).join('<br>');
   const errs = E.validate(input, state.type);
   if (!input.lines.length) errs.unshift('לא הוגדרו שנים לייחוס.');
-  if (state.type === 'severance' && state.payYear - state.sevYears + 1 < E.MIN_YEAR)
-    errs.unshift('אין במחשבון מדרגות מס לשנים שלפני ' + E.MIN_YEAR + '. בחרו פחות שנים לפריסה.');
   $('alert').hidden = !errs.length;
   $('alert').innerHTML = errs.map(esc).join('<br>');
   for (const id of ['pdfCert', 'pdfRefund']) {
@@ -546,7 +572,7 @@ function buildCertSheet() {
   const { input, r } = calc();
   const ys = r.lines.map(l => l.year);
   $('sheet').innerHTML = `
-    <h1>אישור פריסת מס לשנה השוטפת – שנת ${state.payYear}</h1>
+    <h1>אישור תיאום מס – פריסת הכנסה, שנת ${state.payYear}</h1>
     <div class="subt">${TYPE_LABEL[state.type]}</div>
     <div class="fields">
       ${blank('שם הנישום')}${blank('מספר זהות')}
@@ -580,7 +606,7 @@ function buildCertSheet() {
     ${yearsTable(r.lines, 'סה"כ')}
     <div class="foot">${FOOT}</div>
     <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
-  return `אישור-פריסה-${state.payYear}.pdf`;
+  return `אישור-תיאום-מס-${state.payYear}.pdf`;
 }
 
 async function makePdf(btn, build) {
@@ -604,6 +630,24 @@ async function makePdf(btn, build) {
 }
 $('pdfCert').addEventListener('click', e => makePdf(e.currentTarget, buildCertSheet));
 $('pdfRefund').addEventListener('click', e => makePdf(e.currentTarget, buildRefundSheet));
+
+// ---- mode: tax coordination (2026 only) or annual report (2020-2025) ----
+const MODE_YEARS = { coord: [2026], annual: [2020, 2021, 2022, 2023, 2024, 2025] };
+function setMode(mode) {
+  state.mode = mode;
+  const ys = MODE_YEARS[mode];
+  if (!ys.includes(state.payYear)) state.payYear = ys[ys.length - 1];
+  $('payYear').innerHTML = ys.map(y => `<option${y === state.payYear ? ' selected' : ''}>${y}</option>`).join('');
+  $('payYear').disabled = ys.length === 1;
+  $('work').hidden = false;
+  $('modeHint').hidden = true;
+  $('certPanel').hidden = mode !== 'coord';
+  $('refundPanel').hidden = mode !== 'annual';
+  $('statNoSpread').hidden = mode !== 'annual';
+  applyType();
+  if (state.type !== 'severance') split();
+}
+for (const id of ['modeCoord', 'modeAnnual']) $(id).addEventListener('change', e => setMode(e.target.value));
 
 // ---- init with example (marked as example in the header) ----
 $('total').value = fmt(state.total);

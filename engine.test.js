@@ -195,3 +195,13 @@ test('refund report: prior-year share removed from report-year income and withhe
   near(a.tax, 60000 - a.prevTax);
   assert.equal(E.refundAdjust(r, 2026, null, null).income, null);
 });
+
+test('severance shares of years before 2020 stay in the payment year', () => {
+  // received 2021, 4 years -> 2018,2019 not supported -> added to 2021
+  const s = E.severanceYears(100000, 2021, 4);
+  assert.deepEqual(s.map(x => [x.year, x.alloc]), [[2020, 25000], [2021, 75000]]);
+  const lines = s.map(x => ({ year: x.year, alloc: x.alloc, base: 0 }));
+  assert.deepEqual(E.validate({ total: 100000, payYear: 2021, lines }, 'severance'), []);
+  // payment year below the equal share is still an error
+  assert.ok(E.validate({ total: 100000, payYear: 2021, lines: [{ year: 2020, alloc: 70000, base: 0 }, { year: 2021, alloc: 30000, base: 0 }] }, 'severance').length);
+});

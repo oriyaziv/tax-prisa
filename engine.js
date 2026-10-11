@@ -135,10 +135,16 @@
 
   // ---------- Spread ----------
   // Severance backward spread: equal parts over n tax years ending in the payment year (n <= 6).
+  // Shares of years before MIN_YEAR are not spread: they are added to the payment year.
   function severanceYears(total, payYear, n) {
     n = Math.max(1, Math.min(6, Math.floor(n)));
     const share = Math.floor(total / n), out = [];
-    for (let i = n - 1; i >= 0; i--) out.push({ year: payYear - i, alloc: i === 0 ? total - share * (n - 1) : share });
+    let carried = 0;
+    for (let i = n - 1; i >= 0; i--) {
+      const year = payYear - i, alloc = i === 0 ? total - share * (n - 1) : share;
+      if (year < MIN_YEAR) { carried += alloc; continue; }
+      out.push({ year, alloc: i === 0 ? alloc + carried : alloc });
+    }
     return out;
   }
 
@@ -186,8 +192,12 @@
       const ys = input.lines.map(l => l.year).sort((a, b) => a - b);
       if (ys.length && ys[ys.length - 1] !== input.payYear) errs.push('בפריסת פיצויים אחורה השנה האחרונה היא שנת התשלום.');
       if (ys.some((y, i) => i && y !== ys[i - 1] + 1)) errs.push('בפריסת פיצויים השנים צריכות להיות רצופות.');
-      const allocs = input.lines.map(l => l.alloc);
-      if (allocs.length && Math.max(...allocs) - Math.min(...allocs) > allocs.length) errs.push('בפריסת פיצויים אחורה החלקים צריכים להיות שווים.');
+      // Equal parts across spread years; the payment year may also hold shares of years before MIN_YEAR.
+      const others = input.lines.filter(l => l.year !== input.payYear).map(l => l.alloc);
+      const own = (input.lines.find(l => l.year === input.payYear) || {}).alloc;
+      const tol = input.lines.length;
+      if (others.length && (Math.max(...others) - Math.min(...others) > tol || (own != null && own < Math.min(...others) - tol)))
+        errs.push('בפריסת פיצויים אחורה החלקים צריכים להיות שווים.');
     }
     return errs;
   }
