@@ -76,10 +76,12 @@ test('deferral of birth-year point (table A)', () => {
 
 test('single parent gets both tables cumulatively', () => {
   const sp = { gender: 'F', singleParent: true, children: [{ birthYear: 2016 }] };
-  // 2024: 2.25 + 0.5 + child age 8 (A 2 + B 1) + single-parent point 1 = 6.75
+  // 2024: 2.25 + 0.5 + child age 8 (A 2 + B 1) = 5.75
   const r = E.creditPoints(sp, 2024);
   near(r.items.find(i => i.label === 'ילדים').pts, 3);
-  near(r.total, 6.75);
+  near(r.total, 5.75);
+  // lone parent ("חד הורי"): one additional point
+  near(E.creditPoints({ gender: 'F', loneParent: true }, 2024).total, 2.25 + 0.5 + 1);
   // childTable override: a man receiving the allowance uses table A
   near(E.creditPoints({ gender: 'M', childTable: 'A', children: [{ birthYear: 2010 }] }, 2023).total, 2.25 + 1);
 });
@@ -141,6 +143,14 @@ test('spread: user example 100,000 in 2026, 20,000 to each of 2021-2025, base 15
   near(r.rate, 0.20, 1e-9);
   near(r.noSpread, (228000 - 150000) * 0.20 + (250000 - 228000) * 0.31);
   assert.deepEqual(E.validate({ total: 100000, payYear: 2026, lines }, 'salary'), []);
+});
+
+test('user case: 2025 income 150,000, 8.75 points, 16,000 allocated -> 0 tax', () => {
+  const r = E.computeSpread({ total: 16000, payYear: 2026,
+    lines: [{ year: 2025, alloc: 16000, base: 150000, points: 8.75 }], pay: { base: 0, points: 2.25 } });
+  near(E.grossTax(150000, 2025), 19392);
+  near(E.grossTax(166000, 2025), 22592);           // still below 25,410 credit
+  near(r.sumTax, 0);
 });
 
 test('spread: low-income year absorbs unused credit points', () => {

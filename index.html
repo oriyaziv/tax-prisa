@@ -44,7 +44,11 @@ button.ghost{border-color:var(--line);color:var(--muted);padding:4px 9px}
 button:disabled{opacity:.5;cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .row>label{flex:0 1 160px}
-.sub{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:12px}
+.sub{border-top:1px dashed var(--line);padding-top:10px}
+details.sub>summary{cursor:pointer;font-weight:600;font-size:.95rem;padding-block:2px}
+details.sub[open]>summary{margin-bottom:10px}
+details.sub[open]{display:grid;gap:8px}
+.cnt{font-weight:400;font-size:.8rem;color:var(--accent);margin-inline-start:6px}
 .list{display:grid;gap:8px}
 .list .item{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .list .item>label{flex:0 1 150px}
@@ -71,11 +75,6 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .good{color:var(--good)}
 .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 #pdfMsg{font-size:.9rem;color:var(--muted)}
-details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
-.refgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:12px}
-.refgrid table{font-size:.85rem}
-.refgrid caption{text-align:right;font-weight:600;padding-bottom:4px}
-.rules td{white-space:normal}
 
 /* A4 sheet rendered off-screen for the PDF: always light paper */
 #sheet{position:fixed;top:0;left:-20000px;width:794px;background:#fff;color:#111;font-family:var(--f-body);font-size:12.5px;line-height:1.5;padding:44px 48px;direction:rtl}
@@ -132,29 +131,34 @@ details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
         <option value="B">גבר, או הורה שאינו מקבל קצבת ילדים</option>
         <option value="A">אישה, או הורה שמקבל קצבת ילדים</option></select></label>
       <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
-      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (שתי הטבלאות במצטבר)</label>
+      <label class="check"><input type="checkbox" id="loneParent"> חד הורי (נקודת זיכוי נוספת)</label>
+      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (נקודות הילדים משתי הטבלאות)</label>
     </div>
 
-    <div class="sub">
-      <h3>ילדים</h3>
+    <details class="sub" id="secKids">
+      <summary>ילדים <span class="cnt" id="cntKids"></span></summary>
       <div class="list" id="kids"></div>
       <div><button type="button" class="ghost" id="addKid">+ הוסף ילד</button></div>
-    </div>
+    </details>
 
-    <div class="sub">
-      <h3>עלייה ושירות</h3>
+    <details class="sub" id="secImm">
+      <summary>עולה חדש / תושב חוזר <span class="cnt" id="cntImm"></span></summary>
+      <div class="row"><label>חודש עלייה / חזרה<input type="month" id="immigrant" min="2015-01" max="2026-12"></label></div>
+    </details>
+
+    <details class="sub" id="secSol">
+      <summary>חייל משוחרר / שירות לאומי <span class="cnt" id="cntSol"></span></summary>
       <div class="row">
-        <label>חודש עלייה / חזרה<input type="month" id="immigrant" min="2015-01" max="2026-12"></label>
-        <label>חודש שחרור משירות<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
+        <label>חודש שחרור<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
         <label class="check" style="flex:0 1 auto"><input type="checkbox" id="fullService" checked> שירות מלא (גבר 23 חודשים / אישה 22)</label>
       </div>
-    </div>
+    </details>
 
-    <div class="sub">
-      <h3>השכלה</h3>
+    <details class="sub" id="secDeg">
+      <summary>תואר אקדמי / תעודת מקצוע <span class="cnt" id="cntDeg"></span></summary>
       <div class="list" id="degrees"></div>
       <div><button type="button" class="ghost" id="addDegree">+ הוסף תואר / תעודה</button></div>
-    </div>
+    </details>
   </section>
 
   <section class="panel">
@@ -183,10 +187,11 @@ details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
     <h2>תוצאה</h2>
     <div class="summary">
       <div class="stat key"><div class="k">שיעור מס לניכוי (מקדמה)</div><div class="v" id="rRate"></div></div>
-      <div class="stat"><div class="k">סך המס על התשלום בפריסה</div><div class="v" id="rTax"></div></div>
+      <div class="stat"><div class="k">סה"כ הכנסה שמיוחסת לשנים קודמות</div><div class="v" id="rPrevInc"></div></div>
+      <div class="stat"><div class="k">סה"כ מס שמיוחס לשנים קודמות</div><div class="v" id="rPrevTax"></div></div>
       <div class="stat"><div class="k">מס ללא פריסה (הכל בשנת התשלום)</div><div class="v" id="rNoSpread"></div></div>
-      <div class="stat"><div class="k">חיסכון מהפריסה</div><div class="v" id="rSave"></div></div>
     </div>
+    <p class="note" id="payPart" hidden></p>
     <div class="actions">
       <button id="pdfBtn" type="button" class="primary">הפק PDF</button>
       <span id="pdfMsg" role="status"></span>
@@ -194,31 +199,6 @@ details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
     <p class="note">ב-PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
   </section>
 
-  <section class="panel">
-    <details>
-      <summary>מדרגות המס ושווי נקודת זיכוי, 2020–2026</summary>
-      <p class="note">מדרגות שנתיות על הכנסה מיגיעה אישית. השיעור העליון (50%) כולל מס יסף של 3%. 2025 זהה ל-2024 בגלל הקפאת המדרגות. ב-2026 הורחבו מדרגות ה-20% וה-31% (תיקון 288), בתחולה מ-1.1.2026.</p>
-      <div class="refgrid" id="brackets"></div>
-    </details>
-    <details>
-      <summary>כללי נקודות הזיכוי שבחישוב</summary>
-      <div class="scroll"><table class="rules" style="margin-top:12px">
-        <thead><tr><th>רכיב</th><th>כלל</th><th>סטטוס</th></tr></thead>
-        <tbody>
-          <tr><td>תושב / אישה</td><td>2.25 לתושב, ועוד 0.5 לאישה</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>ילדים – טבלה א (אישה, או הורה שמקבל קצבת ילדים)</td><td>שנת לידה: 1.5 עד 2023, ו-2.5 מ-2024. גילאי 1–2: 2.5, ומ-2024: 4.5. גיל 3: 2.5, ומ-2024: 3.5. גילאי 4–5: 2.5. גילאי 6–12: 1 ב-2020–2021, ו-2 מ-2022. גילאי 13–17: 1 עד 2023, ו-2 מ-2024. גיל 18: 0.5</td><td><span class="tag">מאומת 2020–2025</span></td></tr>
-          <tr><td>ילדים – טבלה ב (גבר, או הורה שאינו מקבל קצבת ילדים)</td><td>גילאי 0–5 כמו טבלה א. גילאי 6–12: 0 ב-2020–2021, ו-1 מ-2022. גילאי 13–17: 0 עד 2023, ו-1 מ-2024. גיל 18: 0</td><td><span class="tag">מאומת 2020–2025</span></td></tr>
-          <tr><td>דחיית נקודה משנת הלידה (טבלה א)</td><td>עד 2023: 0.5 בשנת הלידה ו-3.5 בגיל 1. מ-2024: 1.5 בשנת הלידה ו-5.5 בגיל 1</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>ילדים ב-2026</td><td>לפי כללי 2024–2025</td><td><span class="tag warn">לאמת</span></td></tr>
-          <tr><td>ילד נטול יכולת</td><td>2 נקודות לכל ילד עד גיל 18</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>הורה יחיד</td><td>נקודות שתי טבלאות הילדים במצטבר, ועוד נקודה נוספת אחת</td><td><span class="tag">שתי הטבלאות: מאומת</span><span class="tag warn">הנקודה הנוספת: לאמת</span></td></tr>
-          <tr><td>עולה / תושב חוזר</td><td>עלייה מ-2022: 12 חודשים ב-1, 18 ב-3, 12 ב-2, 12 ב-1 (סה"כ 8.5 נקודות). עלייה לפני 2022: 18 חודשים ב-3, 12 ב-2, 12 ב-1</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>חייל משוחרר / שירות לאומי</td><td>36 חודשים מהחודש שאחרי השחרור. שירות מלא: 2 לשנה, שירות חלקי: 1 לשנה</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>השכלה</td><td>מהשנה שאחרי הסיום. תואר ראשון: עד 2022 נקודה לשנה אחת, מ-2023 נקודה לשנה לפי שנות הלימוד (עד 3). תואר שני: עד 2022 חצי נקודה לשנה אחת, מ-2023 חצי נקודה לעד שנתיים. תעודת מקצוע: נקודה לשנה אחת</td><td><span class="tag warn">לאמת</span></td></tr>
-        </tbody>
-      </table></div>
-    </details>
-  </section>
 </div>
 
 <div id="sheet" aria-hidden="true"></div>
@@ -245,7 +225,7 @@ const TYPE_NOTE = {
 // ---- state ----
 const state = {
   type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
-  profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
+  profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
   alloc: {},   // year -> amount
   data: {},    // year -> { base, extra, ptsOverride }
 };
@@ -301,10 +281,10 @@ function renderLedger() {
     return `<tr data-y="${y}" class="${y === state.payYear ? 'payrow' : ''}">
       <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
       <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
-      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${fmt(d.base)}"></td>
+      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base ? fmt(d.base) : ''}" placeholder="0"></td>
       <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
         <div class="ptsbreak" data-o="br"></div></td>
-      <td><input class="num" id="ex${y}" data-f="extra" inputmode="numeric" value="${fmt(d.extra)}"></td>
+      <td><input class="num" id="ex${y}" data-f="extra" inputmode="numeric" value="${d.extra ? fmt(d.extra) : ''}" placeholder="0"></td>
       <td data-o="t0"></td><td data-o="t1"></td><td data-o="add"></td><td data-o="rate"></td>
       <td>${allocated && !sev ? `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר שנה">✕</button>` : ''}</td></tr>`;
   }).join('');
@@ -335,10 +315,12 @@ function calc() {
   $('sumTax').textContent = ils(r.sumTax);
   $('sumRate').textContent = pct(r.rate);
   $('rRate').textContent = pct(r.rate);
-  $('rTax').textContent = ils(r.sumTax);
+  const prev = r.lines.filter(l => l.year < state.payYear), cur = r.lines.find(l => l.year === state.payYear);
+  $('rPrevInc').textContent = ils(prev.reduce((s, l) => s + l.alloc, 0));
+  $('rPrevTax').textContent = ils(prev.reduce((s, l) => s + l.add, 0));
+  $('payPart').hidden = !cur;
+  if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
   $('rNoSpread').textContent = ils(r.noSpread);
-  $('rSave').textContent = ils(r.saving);
-  $('rSave').className = 'v' + (r.saving >= 0 ? ' good' : '');
   const errs = E.validate(input, state.type);
   if (!input.lines.length) errs.unshift('לא הוגדרו שנים לייחוס.');
   if (state.type === 'severance' && state.payYear - state.sevYears + 1 < E.MIN_YEAR)
@@ -384,10 +366,10 @@ document.addEventListener('input', e => {
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
-  if (['gender', 'childTable', 'resident', 'singleParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
+  if (['gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     const p = state.profile;
     if (t.id === 'gender') $('childTable').value = t.value === 'F' ? 'A' : 'B';
-    p.gender = $('gender').value; p.childTable = $('childTable').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked;
+    p.gender = $('gender').value; p.childTable = $('childTable').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked; p.loneParent = $('loneParent').checked;
     p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
     renderPointsOnly(); return;
   }
@@ -405,7 +387,15 @@ document.addEventListener('input', e => {
   }
 });
 // Points inputs show auto values; refresh them without rebuilding rows while the user types elsewhere.
+function renderCounts() {
+  const p = state.profile;
+  $('cntKids').textContent = p.children.length ? `(${p.children.length})` : '';
+  $('cntImm').textContent = p.immigrant ? `(${p.immigrant})` : '';
+  $('cntSol').textContent = p.soldier && p.soldier.discharge ? `(${p.soldier.discharge})` : '';
+  $('cntDeg').textContent = p.degrees.length ? `(${p.degrees.length})` : '';
+}
 function renderPointsOnly() {
+  renderCounts();
   for (const y of years()) {
     const el = $('pt' + y); if (!el || document.activeElement === el) continue;
     const pf = pointsFor(y); el.value = ptsFmt(pf.value);
@@ -438,17 +428,6 @@ $('addYear').addEventListener('click', () => {
 });
 $('splitBtn').addEventListener('click', split);
 
-// ---- reference tables ----
-$('brackets').innerHTML = E.YEARS.map(y => {
-  let prev = 0;
-  const rows = E.TAX[y].b.map(([cap, r]) => {
-    const s = `<tr><td>${fmt(prev ? prev + 1 : 0)}</td><td>${cap === Infinity ? 'ומעלה' : fmt(cap)}</td><td>${r}%</td></tr>`;
-    prev = cap; return s;
-  }).join('');
-  return `<table><caption>${y} · נקודת זיכוי ${fmt(E.TAX[y].cp)} ₪ לשנה (${fmt(E.TAX[y].cp / 12)} ₪ לחודש)</caption>
-    <thead><tr><th>מ-</th><th>עד</th><th>שיעור</th></tr></thead><tbody>${rows}</tbody></table>`;
-}).join('');
-
 // ---- PDF ----
 const TYPE_LABEL = { salary: 'הפרשי שכר', severance: 'פיצויים / מענק פרישה (החלק החייב)', other: 'הכנסה חד-פעמית אחרת' };
 function buildSheet() {
@@ -461,6 +440,8 @@ function buildSheet() {
   const ptsRows = labels.map(lb => `<tr><td>${esc(lb)}</td>${ys.map(y => { const it = pointsFor(y).auto.items.find(i => i.label === lb); return `<td>${it ? ptsFmt(it.pts) : ''}</td>`; }).join('')}</tr>`).join('');
   const ptsTotal = `<tr><td>סה"כ בחישוב</td>${ys.map(y => `<td>${ptsFmt(pointsFor(y).value)}${pointsFor(y).overridden ? '*' : ''}</td>`).join('')}</tr>`;
   const anyOverride = ys.some(y => pointsFor(y).overridden);
+  const prevL = r.lines.filter(l => l.year < state.payYear), cur = r.lines.find(l => l.year === state.payYear);
+  const prevInc = prevL.reduce((s, l) => s + l.alloc, 0), prevTax = prevL.reduce((s, l) => s + l.add, 0);
   $('sheet').innerHTML = `
     <h1>חישוב פריסת מס – ייחוס הכנסה לשנים קודמות</h1>
     <div class="subt">${TYPE_LABEL[state.type]} · שנת תשלום ${state.payYear}</div>
@@ -491,10 +472,12 @@ function buildSheet() {
     ${anyOverride ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}
     <h3>סיכום</h3>
     <div class="kv">
+      <span>סה"כ הכנסה שמיוחסת לשנים קודמות</span><b>${ils(prevInc)}</b>
+      <span>סה"כ מס שמיוחס לשנים קודמות</span><b>${ils(prevTax)}</b>
+      ${cur ? `<span>מיוחס לשנת התשלום ${state.payYear}</span><b>הכנסה ${ils(cur.alloc)} · מס ${ils(cur.add)}</b>` : ''}
       <span>סך המס על התשלום בפריסה</span><b>${ils(r.sumTax)}</b>
       <span>שיעור מס לניכוי במקור (מקדמה)</span><b>${pct(r.rate)}</b>
       <span>מס ללא פריסה (בשנת ${state.payYear})</span><b>${ils(r.noSpread)}</b>
-      <span>חיסכון מהפריסה</span><b>${ils(r.saving)}</b>
     </div>
     <div class="foot">החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.</div>
     <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
@@ -524,7 +507,6 @@ $('pdfBtn').addEventListener('click', async () => {
 $('total').value = fmt(state.total);
 yearOptions($('payYear'), state.payYear);
 $('sevYears').value = String(state.sevYears);
-for (const y of [2021, 2022, 2023, 2024, 2025, 2026]) yd(y).base = 150000;
 renderKids(); renderDegrees();
 applyType();
 split();

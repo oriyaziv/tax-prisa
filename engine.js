@@ -107,7 +107,7 @@
 
   const DEGREE_LABEL = { BA: 'תואר ראשון', MA: 'תואר שני', CERT: 'תעודת מקצוע' };
 
-  // profile: { gender:'M'|'F', childTable:'A'|'B' (default by gender), resident, children:[{birthYear, disabled, defer}], singleParent,
+  // profile: { gender:'M'|'F', childTable:'A'|'B' (default by gender), resident, children:[{birthYear, disabled, defer}], singleParent (both tables), loneParent (+1 point),
   //   immigrant:'YYYY-MM', soldier:{discharge:'YYYY-MM', full}, degrees:[{type, year, studyYears}] }
   function creditPoints(profile, year) {
     const p = profile || {};
@@ -125,7 +125,7 @@
     }
     add('ילדים', kids, year > 2025); // table verified for 2020-2025; 2026 assumes the 2024-2025 rules
     add('ילד נטול יכולת', disabled);
-    if (p.singleParent && (p.children || []).some(c => year - +c.birthYear >= 0 && year - +c.birthYear <= 18)) add('נקודה נוספת להורה יחיד', 1, true);
+    if (p.loneParent) add('חד הורי', 1);
     add('עולה / תושב חוזר', immigrantPoints(p.immigrant, year));
     if (p.soldier) add('חייל משוחרר / שירות לאומי', soldierPoints(p.soldier.discharge, p.soldier.full, year));
     for (const d of p.degrees || []) add(DEGREE_LABEL[d.type] || 'השכלה', degreePoints(d, year), true);
