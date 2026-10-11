@@ -39,9 +39,13 @@
   // Every rule carries `verify: true` when the sources found disagree or are not official; the UI flags those.
 
   // Child points by age in the tax year (age = taxYear - birthYear; 0 = birth year).
-  function childPoints(age, year, parent) {
+  // Table A: a woman, or the parent who has the child and receives the child allowance.
+  // Table B: a man, or a parent who does not. Source: the 2020-2025 summary table supplied by the user.
+  // `defer`: table A may move one point from the birth year to age 1.
+  function childPoints(age, year, parent, defer) {
     if (age < 0 || age > 18) return 0;
-    const mother = parent === 'F';
+    const mother = parent === 'F' || parent === 'A';
+    if (mother && defer && (age === 0 || age === 1)) return childPoints(age, year, 'A') + (age === 0 ? -1 : 1);
     if (age === 18) return mother ? 0.5 : 0;
     if (year >= 2024) {
       if (age === 0) return 2.5;
@@ -103,7 +107,7 @@
 
   const DEGREE_LABEL = { BA: 'תואר ראשון', MA: 'תואר שני', CERT: 'תעודת מקצוע' };
 
-  // profile: { gender:'M'|'F', resident, children:[{birthYear, disabled}], singleParent,
+  // profile: { gender:'M'|'F', childTable:'A'|'B' (default by gender), resident, children:[{birthYear, disabled, defer}], singleParent,
   //   immigrant:'YYYY-MM', soldier:{discharge:'YYYY-MM', full}, degrees:[{type, year, studyYears}] }
   function creditPoints(profile, year) {
     const p = profile || {};
@@ -114,12 +118,14 @@
     let kids = 0, disabled = 0;
     for (const c of p.children || []) {
       const by = +c.birthYear; if (!by) continue;
-      kids += childPoints(year - by, year, p.gender);
+      // A single parent receives both tables cumulatively.
+      const tables = p.singleParent ? ['A', 'B'] : [p.childTable || (p.gender === 'F' ? 'A' : 'B')];
+      for (const t of tables) kids += childPoints(year - by, year, t, c.defer);
       if (c.disabled && year - by <= 18) disabled += 2;
     }
-    add('ילדים', kids, p.gender !== 'F'); // father's table is less certain than the mother's
+    add('ילדים', kids, year > 2025); // table verified for 2020-2025; 2026 assumes the 2024-2025 rules
     add('ילד נטול יכולת', disabled);
-    if (p.singleParent && (p.children || []).some(c => year - +c.birthYear >= 0 && year - +c.birthYear <= 18)) add('הורה יחיד', 1, true);
+    if (p.singleParent && (p.children || []).some(c => year - +c.birthYear >= 0 && year - +c.birthYear <= 18)) add('נקודה נוספת להורה יחיד', 1, true);
     add('עולה / תושב חוזר', immigrantPoints(p.immigrant, year));
     if (p.soldier) add('חייל משוחרר / שירות לאומי', soldierPoints(p.soldier.discharge, p.soldier.full, year));
     for (const d of p.degrees || []) add(DEGREE_LABEL[d.type] || 'השכלה', degreePoints(d, year), true);

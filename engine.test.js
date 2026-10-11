@@ -54,6 +54,36 @@ test('children points', () => {
   assert.equal(E.childPoints(-1, 2024, 'F'), 0);
 });
 
+test('children table 2020-2025 (supplied summary table), full grid', () => {
+  const A = { 0: [1.5, 1.5, 2.5], 1: [2.5, 2.5, 4.5], 2: [2.5, 2.5, 4.5], 3: [2.5, 2.5, 3.5], 4: [2.5, 2.5, 2.5], 5: [2.5, 2.5, 2.5],
+    6: [1, 2, 2], 12: [1, 2, 2], 13: [1, 1, 2], 17: [1, 1, 2], 18: [0.5, 0.5, 0.5] };
+  const B = { 0: [1.5, 1.5, 2.5], 1: [2.5, 2.5, 4.5], 2: [2.5, 2.5, 4.5], 3: [2.5, 2.5, 3.5], 4: [2.5, 2.5, 2.5], 5: [2.5, 2.5, 2.5],
+    6: [0, 1, 1], 12: [0, 1, 1], 13: [0, 0, 1], 17: [0, 0, 1], 18: [0, 0, 0] };
+  const periods = [[2020, 2021], [2022, 2023], [2024, 2025]];
+  for (const [t, tbl] of [['A', A], ['B', B]])
+    for (const age of Object.keys(tbl))
+      periods.forEach((ys, i) => ys.forEach(y => assert.equal(E.childPoints(+age, y, t), tbl[age][i], `table ${t} age ${age} year ${y}`)));
+});
+
+test('deferral of birth-year point (table A)', () => {
+  assert.equal(E.childPoints(0, 2023, 'A', true), 0.5);
+  assert.equal(E.childPoints(1, 2023, 'A', true), 3.5);
+  assert.equal(E.childPoints(0, 2024, 'A', true), 1.5);
+  assert.equal(E.childPoints(1, 2024, 'A', true), 5.5);
+  assert.equal(E.childPoints(2, 2024, 'A', true), 4.5);  // only birth year and age 1 change
+  assert.equal(E.childPoints(0, 2024, 'B', true), 2.5);  // table B cannot defer
+});
+
+test('single parent gets both tables cumulatively', () => {
+  const sp = { gender: 'F', singleParent: true, children: [{ birthYear: 2016 }] };
+  // 2024: 2.25 + 0.5 + child age 8 (A 2 + B 1) + single-parent point 1 = 6.75
+  const r = E.creditPoints(sp, 2024);
+  near(r.items.find(i => i.label === 'ילדים').pts, 3);
+  near(r.total, 6.75);
+  // childTable override: a man receiving the allowance uses table A
+  near(E.creditPoints({ gender: 'M', childTable: 'A', children: [{ birthYear: 2010 }] }, 2023).total, 2.25 + 1);
+});
+
 test('new immigrant, arrival from 2022 (54 months)', () => {
   const a = '2022-03';
   near(E.immigrantPoints(a, 2022), 10 / 12);

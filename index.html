@@ -128,8 +128,11 @@ details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
     <p class="note">הפרטים כאן משמשים רק לחישוב, ואינם מודפסים ב-PDF. נקודות הזיכוי מחושבות לכל שנה בנפרד, ואפשר לתקן כל שנה ידנית בטבלה.</p>
     <div class="grid">
       <label>מין<select id="gender"><option value="M">גבר</option><option value="F">אישה</option></select></label>
+      <label>טבלת נקודות ילדים<select id="childTable">
+        <option value="B">גבר, או הורה שאינו מקבל קצבת ילדים</option>
+        <option value="A">אישה, או הורה שמקבל קצבת ילדים</option></select></label>
       <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
-      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד</label>
+      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (שתי הטבלאות במצטבר)</label>
     </div>
 
     <div class="sub">
@@ -203,10 +206,12 @@ details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
         <thead><tr><th>רכיב</th><th>כלל</th><th>סטטוס</th></tr></thead>
         <tbody>
           <tr><td>תושב / אישה</td><td>2.25 לתושב, ועוד 0.5 לאישה</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>ילדים, 2020–2023</td><td>שנת לידה 1.5, גילאי 1–5: 2.5. גילאי 6–17: אם 1, אב 0. בשנים 2022–2023 עוד נקודה לגילאי 6–12 לשני ההורים. גיל 18: אם 0.5</td><td><span class="tag">אם: מאומת</span><span class="tag warn">אב: לאמת</span></td></tr>
-          <tr><td>ילדים, מ-2024</td><td>שנת לידה 2.5, גילאי 1–2: 4.5, גיל 3: 3.5, גילאי 4–5: 2.5. גילאי 6–17: אם 2, אב 1. גיל 18: אם 0.5</td><td><span class="tag">אם: מאומת</span><span class="tag warn">אב: לאמת</span></td></tr>
+          <tr><td>ילדים – טבלה א (אישה, או הורה שמקבל קצבת ילדים)</td><td>שנת לידה: 1.5 עד 2023, ו-2.5 מ-2024. גילאי 1–2: 2.5, ומ-2024: 4.5. גיל 3: 2.5, ומ-2024: 3.5. גילאי 4–5: 2.5. גילאי 6–12: 1 ב-2020–2021, ו-2 מ-2022. גילאי 13–17: 1 עד 2023, ו-2 מ-2024. גיל 18: 0.5</td><td><span class="tag">מאומת 2020–2025</span></td></tr>
+          <tr><td>ילדים – טבלה ב (גבר, או הורה שאינו מקבל קצבת ילדים)</td><td>גילאי 0–5 כמו טבלה א. גילאי 6–12: 0 ב-2020–2021, ו-1 מ-2022. גילאי 13–17: 0 עד 2023, ו-1 מ-2024. גיל 18: 0</td><td><span class="tag">מאומת 2020–2025</span></td></tr>
+          <tr><td>דחיית נקודה משנת הלידה (טבלה א)</td><td>עד 2023: 0.5 בשנת הלידה ו-3.5 בגיל 1. מ-2024: 1.5 בשנת הלידה ו-5.5 בגיל 1</td><td><span class="tag">מאומת</span></td></tr>
+          <tr><td>ילדים ב-2026</td><td>לפי כללי 2024–2025</td><td><span class="tag warn">לאמת</span></td></tr>
           <tr><td>ילד נטול יכולת</td><td>2 נקודות לכל ילד עד גיל 18</td><td><span class="tag">מאומת</span></td></tr>
-          <tr><td>הורה יחיד</td><td>נקודה נוספת אחת</td><td><span class="tag warn">לאמת</span></td></tr>
+          <tr><td>הורה יחיד</td><td>נקודות שתי טבלאות הילדים במצטבר, ועוד נקודה נוספת אחת</td><td><span class="tag">שתי הטבלאות: מאומת</span><span class="tag warn">הנקודה הנוספת: לאמת</span></td></tr>
           <tr><td>עולה / תושב חוזר</td><td>עלייה מ-2022: 12 חודשים ב-1, 18 ב-3, 12 ב-2, 12 ב-1 (סה"כ 8.5 נקודות). עלייה לפני 2022: 18 חודשים ב-3, 12 ב-2, 12 ב-1</td><td><span class="tag">מאומת</span></td></tr>
           <tr><td>חייל משוחרר / שירות לאומי</td><td>36 חודשים מהחודש שאחרי השחרור. שירות מלא: 2 לשנה, שירות חלקי: 1 לשנה</td><td><span class="tag">מאומת</span></td></tr>
           <tr><td>השכלה</td><td>מהשנה שאחרי הסיום. תואר ראשון: עד 2022 נקודה לשנה אחת, מ-2023 נקודה לשנה לפי שנות הלימוד (עד 3). תואר שני: עד 2022 חצי נקודה לשנה אחת, מ-2023 חצי נקודה לעד שנתיים. תעודת מקצוע: נקודה לשנה אחת</td><td><span class="tag warn">לאמת</span></td></tr>
@@ -240,7 +245,7 @@ const TYPE_NOTE = {
 // ---- state ----
 const state = {
   type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
-  profile: { gender: 'M', resident: true, singleParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
+  profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
   alloc: {},   // year -> amount
   data: {},    // year -> { base, extra, ptsOverride }
 };
@@ -274,6 +279,7 @@ function renderKids() {
   $('kids').innerHTML = state.profile.children.map((c, i) => `<div class="item">
     <label>שנת לידה<input class="num" id="kid${i}" data-kid="${i}" data-f="birthYear" inputmode="numeric" value="${c.birthYear || ''}"></label>
     <label class="check" style="flex:0 1 auto"><input type="checkbox" id="kidd${i}" data-kid="${i}" data-f="disabled"${c.disabled ? ' checked' : ''}> ילד נטול יכולת</label>
+    <label class="check" style="flex:0 1 auto"><input type="checkbox" id="kidf${i}" data-kid="${i}" data-f="defer"${c.defer ? ' checked' : ''}> דחיית נקודה משנת הלידה</label>
     <button type="button" class="ghost" data-delkid="${i}" aria-label="הסר ילד">✕</button></div>`).join('') || '<p class="note">לא הוזנו ילדים.</p>';
 }
 function renderDegrees() {
@@ -378,9 +384,10 @@ document.addEventListener('input', e => {
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
-  if (['gender', 'resident', 'singleParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
+  if (['gender', 'childTable', 'resident', 'singleParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     const p = state.profile;
-    p.gender = $('gender').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked;
+    if (t.id === 'gender') $('childTable').value = t.value === 'F' ? 'A' : 'B';
+    p.gender = $('gender').value; p.childTable = $('childTable').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked;
     p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
     renderPointsOnly(); return;
   }
