@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>מחשבון פריסת מס</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&display=swap">
+<style>
+/* Layout: one working column: payment → taxpayer details → years ledger → result; bracket/rules reference at the bottom. Off-screen A4 sheet feeds the PDF. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18221e; --muted:#5b6862; --line:#d5ddd9;
+  --accent:#1d5c48; --accent-ink:#ffffff; --accent-soft:#e2eee9;
+  --warn:#8a5200; --warn-soft:#fbf0dc; --good:#1d6b3a; --bad:#a3271b; --bad-soft:#fbe6e3;
+  --f-display:"Frank Ruhl Libre","David Libre",Georgia,serif;
+  --f-body:"IBM Plex Sans Hebrew","Segoe UI",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121816; --surface:#1a2320; --ink:#e4ece8; --muted:#9aaba3; --line:#2e3b36;
+  --accent:#6cc3a3; --accent-ink:#0d1a15; --accent-soft:#203a31;
+  --warn:#f0b75c; --warn-soft:#3a2d16; --good:#7fd39b; --bad:#ff8a7a; --bad-soft:#3d1f1b; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:28px 60px;display:grid;gap:20px}
+header h1{font-family:var(--f-display);font-weight:700;font-size:2rem;margin:0;text-wrap:balance}
+header p{margin:.3rem 0 0;color:var(--muted);max-width:70ch}
+section.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
+h2{font-family:var(--f-display);font-weight:500;font-size:1.3rem;margin:0}
+h3{font-size:.95rem;margin:0;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
+label.check{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:.9rem}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;font-variant-numeric:tabular-nums}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input.num{direction:ltr;text-align:right}
+input[readonly]{opacity:.75}
+input.override{border-color:var(--warn);background:var(--warn-soft)}
+button{font:inherit;cursor:pointer;border-radius:6px;padding:8px 14px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:500}
+button.primary{background:var(--accent);color:var(--accent-ink)}
+button.ghost{border-color:var(--line);color:var(--muted);padding:4px 9px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.row>label{flex:0 1 160px}
+.sub{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:12px}
+.list{display:grid;gap:8px}
+.list .item{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.list .item>label{flex:0 1 150px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;vertical-align:middle}
+th{font-size:.78rem;color:var(--muted);font-weight:500;letter-spacing:.02em}
+td input{min-width:105px}
+td input.pts{min-width:76px}
+tr.payrow td{background:var(--accent-soft)}
+tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
+.tag{display:inline-block;font-size:.72rem;padding:1px 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-inline-start:6px}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.ptsbreak{font-size:.75rem;color:var(--muted);white-space:normal;min-width:190px;max-width:240px;line-height:1.4;margin-top:4px}
+.ptsbreak .v{color:var(--warn)}
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:12px}
+.stat .k{font-size:.8rem;color:var(--muted)}
+.stat .v{font-size:1.45rem;font-weight:600;font-variant-numeric:tabular-nums}
+.stat.key{background:var(--accent-soft);border-color:var(--accent)}
+.stat.key .v{color:var(--accent)}
+.good{color:var(--good)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#pdfMsg{font-size:.9rem;color:var(--muted)}
+details summary{cursor:pointer;font-family:var(--f-display);font-size:1.15rem}
+.refgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:12px}
+.refgrid table{font-size:.85rem}
+.refgrid caption{text-align:right;font-weight:600;padding-bottom:4px}
+.rules td{white-space:normal}
+
+/* A4 sheet rendered off-screen for the PDF: always light paper */
+#sheet{position:fixed;top:0;left:-20000px;width:794px;background:#fff;color:#111;font-family:var(--f-body);font-size:12.5px;line-height:1.5;padding:44px 48px;direction:rtl}
+#sheet h1{font-family:var(--f-display);font-size:21px;margin:0 0 2px;font-weight:700;color:#111}
+#sheet .subt{color:#444;margin-bottom:16px}
+#sheet .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;margin-bottom:18px}
+#sheet .field{display:flex;gap:8px;align-items:flex-end}
+#sheet .field span{white-space:nowrap}
+#sheet .field i{flex:1;border-bottom:1px solid #111;height:18px}
+#sheet h3{font-size:13.5px;margin:16px 0 6px;font-weight:600;color:#111}
+#sheet table{width:100%;border-collapse:collapse}
+#sheet th,#sheet td{border:1px solid #9aa5a0;padding:4px 6px;text-align:right;color:#111;white-space:nowrap}
+#sheet th{background:#eef2f0;font-size:11.5px}
+#sheet tfoot td{font-weight:700;background:#eef2f0}
+#sheet .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 18px}
+#sheet .kv b{font-weight:600}
+#sheet .foot{margin-top:16px;font-size:10px;color:#444}
+#sheet .sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:30px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>מחשבון פריסת מס</h1>
+    <p>ייחוס הפרשי שכר, פיצויים או הכנסה חד-פעמית לשנים קודמות. לכל שנה מחושב המס על הסכום המיוחס לפי מדרגות המס, נקודות הזיכוי והזיכויים של אותה שנה. התוצאה היא שיעור מס לניכוי במקור. הנתונים שמופיעים בפתיחה הם דוגמה.</p>
+  </header>
+
+  <section class="panel">
+    <h2>פרטי התשלום</h2>
+    <div class="grid">
+      <label>סוג התשלום
+        <select id="payType">
+          <option value="salary">הפרשי שכר</option>
+          <option value="severance">פיצויים / מענק פרישה (החלק החייב)</option>
+          <option value="other">הכנסה חד-פעמית אחרת</option>
+        </select>
+      </label>
+      <label>שנת התשלום<select id="payYear"></select></label>
+      <label>סכום חייב במס (₪)<input id="total" class="num" inputmode="numeric"></label>
+      <label id="sevWrap" hidden>מספר שנים לפריסה (כולל שנת התשלום)
+        <select id="sevYears"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+      </label>
+    </div>
+    <p class="note" id="typeNote"></p>
+  </section>
+
+  <section class="panel">
+    <h2>פרטי הנישום לחישוב נקודות זיכוי</h2>
+    <p class="note">הפרטים כאן משמשים רק לחישוב, ואינם מודפסים ב-PDF. נקודות הזיכוי מחושבות לכל שנה בנפרד, ואפשר לתקן כל שנה ידנית בטבלה.</p>
+    <div class="grid">
+      <label>מין<select id="gender"><option value="M">גבר</option><option value="F">אישה</option></select></label>
+      <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
+      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד</label>
+    </div>
+
+    <div class="sub">
+      <h3>ילדים</h3>
+      <div class="list" id="kids"></div>
+      <div><button type="button" class="ghost" id="addKid">+ הוסף ילד</button></div>
+    </div>
+
+    <div class="sub">
+      <h3>עלייה ושירות</h3>
+      <div class="row">
+        <label>חודש עלייה / חזרה<input type="month" id="immigrant" min="2015-01" max="2026-12"></label>
+        <label>חודש שחרור משירות<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
+        <label class="check" style="flex:0 1 auto"><input type="checkbox" id="fullService" checked> שירות מלא (גבר 23 חודשים / אישה 22)</label>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>השכלה</h3>
+      <div class="list" id="degrees"></div>
+      <div><button type="button" class="ghost" id="addDegree">+ הוסף תואר / תעודה</button></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>ייחוס לשנים</h2>
+    <div class="row" id="splitRow">
+      <label>משנה<select id="fromYear"></select></label>
+      <label>עד שנה<select id="toYear"></select></label>
+      <button id="splitBtn" type="button">חלק בשווה לשנים אלה</button>
+      <button id="addYear" type="button" class="ghost">+ הוסף שנה</button>
+    </div>
+    <p class="note">הכנסה חייבת: מטופס 106 של אותה שנה, בלי התשלום. זיכויים נוספים (₪): הזיכויים בשקלים לאותה שנה, כמו הפקדות לפנסיה ולביטוח, תרומות וישוב מזכה. אם בשנה מסוימת לא הייתה הכנסה, הזינו 0. נקודות הזיכוי שלא נוצלו יקוזזו מהמס על הסכום המיוחס. שורת שנת התשלום משמשת גם להשוואה למצב ללא פריסה.</p>
+    <div class="scroll">
+      <table id="ledger">
+        <thead><tr>
+          <th>שנת מס</th><th>סכום מיוחס (₪)</th><th>הכנסה חייבת (₪)</th><th>נקודות זיכוי</th><th>זיכויים נוספים (₪)</th>
+          <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על הסכום המיוחס</th><th>שיעור</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot><tr><td>סה"כ</td><td id="sumAlloc"></td><td colspan="5"></td><td id="sumTax"></td><td id="sumRate"></td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <div id="alert" class="alert" hidden></div>
+  </section>
+
+  <section class="panel">
+    <h2>תוצאה</h2>
+    <div class="summary">
+      <div class="stat key"><div class="k">שיעור מס לניכוי (מקדמה)</div><div class="v" id="rRate"></div></div>
+      <div class="stat"><div class="k">סך המס על התשלום בפריסה</div><div class="v" id="rTax"></div></div>
+      <div class="stat"><div class="k">מס ללא פריסה (הכל בשנת התשלום)</div><div class="v" id="rNoSpread"></div></div>
+      <div class="stat"><div class="k">חיסכון מהפריסה</div><div class="v" id="rSave"></div></div>
+    </div>
+    <div class="actions">
+      <button id="pdfBtn" type="button" class="primary">הפק PDF</button>
+      <span id="pdfMsg" role="status"></span>
+    </div>
+    <p class="note">ב-PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>מדרגות המס ושווי נקודת זיכוי, 2020–2026</summary>
+      <p class="note">מדרגות שנתיות על הכנסה מיגיעה אישית. השיעור העליון (50%) כולל מס יסף של 3%. 2025 זהה ל-2024 בגלל הקפאת המדרגות. ב-2026 הורחבו מדרגות ה-20% וה-31% (תיקון 288), בתחולה מ-1.1.2026.</p>
+      <div class="refgrid" id="brackets"></div>
+    </details>
+    <details>
+      <summary>כללי נקודות הזיכוי שבחישוב</summary>
+      <div class="scroll"><table class="rules" style="margin-top:12px">
+        <thead><tr><th>רכיב</th><th>כלל</th><th>סטטוס</th></tr></thead>
+        <tbody>
+          <tr><td>תושב / אישה</td><td>2.25 לתושב, ועוד 0.5 לאישה</td><td><span class="tag">מאומת</span></td></tr>
+          <tr><td>ילדים, 2020–2023</td><td>שנת לידה 1.5, גילאי 1–5: 2.5. גילאי 6–17: אם 1, אב 0. בשנים 2022–2023 עוד נקודה לגילאי 6–12 לשני ההורים. גיל 18: אם 0.5</td><td><span class="tag">אם: מאומת</span><span class="tag warn">אב: לאמת</span></td></tr>
+          <tr><td>ילדים, מ-2024</td><td>שנת לידה 2.5, גילאי 1–2: 4.5, גיל 3: 3.5, גילאי 4–5: 2.5. גילאי 6–17: אם 2, אב 1. גיל 18: אם 0.5</td><td><span class="tag">אם: מאומת</span><span class="tag warn">אב: לאמת</span></td></tr>
+          <tr><td>ילד נטול יכולת</td><td>2 נקודות לכל ילד עד גיל 18</td><td><span class="tag">מאומת</span></td></tr>
+          <tr><td>הורה יחיד</td><td>נקודה נוספת אחת</td><td><span class="tag warn">לאמת</span></td></tr>
+          <tr><td>עולה / תושב חוזר</td><td>עלייה מ-2022: 12 חודשים ב-1, 18 ב-3, 12 ב-2, 12 ב-1 (סה"כ 8.5 נקודות). עלייה לפני 2022: 18 חודשים ב-3, 12 ב-2, 12 ב-1</td><td><span class="tag">מאומת</span></td></tr>
+          <tr><td>חייל משוחרר / שירות לאומי</td><td>36 חודשים מהחודש שאחרי השחרור. שירות מלא: 2 לשנה, שירות חלקי: 1 לשנה</td><td><span class="tag">מאומת</span></td></tr>
+          <tr><td>השכלה</td><td>מהשנה שאחרי הסיום. תואר ראשון: עד 2022 נקודה לשנה אחת, מ-2023 נקודה לשנה לפי שנות הלימוד (עד 3). תואר שני: עד 2022 חצי נקודה לשנה אחת, מ-2023 חצי נקודה לעד שנתיים. תעודת מקצוע: נקודה לשנה אחת</td><td><span class="tag warn">לאמת</span></td></tr>
+        </tbody>
+      </table></div>
+    </details>
+  </section>
+</div>
+
+<div id="sheet" aria-hidden="true"></div>
+
+<script src="lib/html2canvas.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="engine.js"></script>
+<script>
+const E = window.TaxEngine;
+const $ = id => document.getElementById(id);
+const num = s => { const v = parseFloat(String(s).replace(/[^\d.\-]/g, '')); return isFinite(v) ? v : 0; };
+const fmt = v => Math.round(v).toLocaleString('he-IL');
+const ils = v => '₪' + fmt(v);
+const pct = v => isFinite(v) ? (v * 100).toFixed(2) + '%' : '—';
+const ptsFmt = v => (Math.round(v * 100) / 100).toString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const TYPE_NOTE = {
+  salary: 'הפרשי שכר מיוחסים לשנים שאליהן הם מתייחסים. אפשר לחלק בשווה או להזין סכום לכל שנה.',
+  severance: 'פריסת פיצויים אחורה: חלקים שנתיים שווים על פני עד 6 שנות מס שמסתיימות בשנת התשלום, ורק על שנות עבודה. הזינו רק את החלק החייב, אחרי הפטור.',
+  other: 'ייחוס חופשי לשנים שעד שנת התשלום.',
+};
+
+// ---- state ----
+const state = {
+  type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
+  profile: { gender: 'M', resident: true, singleParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
+  alloc: {},   // year -> amount
+  data: {},    // year -> { base, extra, ptsOverride }
+};
+const yd = y => (state.data[y] ||= { base: 0, extra: 0, ptsOverride: null });
+
+function years() {
+  const s = new Set(Object.keys(state.alloc).map(Number));
+  s.add(state.payYear);
+  return [...s].sort((a, b) => a - b);
+}
+function pointsFor(y) {
+  const auto = E.creditPoints(state.profile, y);
+  const o = yd(y).ptsOverride;
+  return { auto, value: o == null ? auto.total : o, overridden: o != null };
+}
+
+function buildInput() {
+  const lines = Object.keys(state.alloc).map(Number).sort((a, b) => a - b).map(y => ({
+    year: y, alloc: state.alloc[y], base: yd(y).base, points: pointsFor(y).value, extraCredit: yd(y).extra,
+  }));
+  const p = yd(state.payYear);
+  return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base, points: pointsFor(state.payYear).value, extraCredit: p.extra } };
+}
+
+// ---- rendering ----
+function yearOptions(sel, val, max) {
+  sel.innerHTML = E.YEARS.filter(y => y <= (max ?? E.MAX_YEAR)).map(y => `<option${y === val ? ' selected' : ''}>${y}</option>`).join('');
+}
+
+function renderKids() {
+  $('kids').innerHTML = state.profile.children.map((c, i) => `<div class="item">
+    <label>שנת לידה<input class="num" id="kid${i}" data-kid="${i}" data-f="birthYear" inputmode="numeric" value="${c.birthYear || ''}"></label>
+    <label class="check" style="flex:0 1 auto"><input type="checkbox" id="kidd${i}" data-kid="${i}" data-f="disabled"${c.disabled ? ' checked' : ''}> ילד נטול יכולת</label>
+    <button type="button" class="ghost" data-delkid="${i}" aria-label="הסר ילד">✕</button></div>`).join('') || '<p class="note">לא הוזנו ילדים.</p>';
+}
+function renderDegrees() {
+  $('degrees').innerHTML = state.profile.degrees.map((d, i) => `<div class="item">
+    <label>סוג<select id="deg${i}" data-deg="${i}" data-f="type">
+      <option value="BA"${d.type === 'BA' ? ' selected' : ''}>תואר ראשון</option>
+      <option value="MA"${d.type === 'MA' ? ' selected' : ''}>תואר שני</option>
+      <option value="CERT"${d.type === 'CERT' ? ' selected' : ''}>תעודת מקצוע</option></select></label>
+    <label>שנת סיום<input class="num" id="degy${i}" data-deg="${i}" data-f="year" inputmode="numeric" value="${d.year || ''}"></label>
+    <label>שנות לימוד<input class="num" id="degs${i}" data-deg="${i}" data-f="studyYears" inputmode="numeric" value="${d.studyYears || ''}"></label>
+    <button type="button" class="ghost" data-deldeg="${i}" aria-label="הסר">✕</button></div>`).join('') || '<p class="note">לא הוזנה השכלה.</p>';
+}
+
+function renderLedger() {
+  const sev = state.type === 'severance';
+  $('ledger').tBodies[0].innerHTML = years().map(y => {
+    const allocated = Object.prototype.hasOwnProperty.call(state.alloc, y);
+    const d = yd(y), pf = pointsFor(y);
+    return `<tr data-y="${y}" class="${y === state.payYear ? 'payrow' : ''}">
+      <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
+      <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
+      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${fmt(d.base)}"></td>
+      <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
+        <div class="ptsbreak" data-o="br"></div></td>
+      <td><input class="num" id="ex${y}" data-f="extra" inputmode="numeric" value="${fmt(d.extra)}"></td>
+      <td data-o="t0"></td><td data-o="t1"></td><td data-o="add"></td><td data-o="rate"></td>
+      <td>${allocated && !sev ? `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר שנה">✕</button>` : ''}</td></tr>`;
+  }).join('');
+  calc();
+}
+
+function breakdownHtml(y) {
+  const pf = pointsFor(y);
+  const parts = pf.auto.items.map(i => `${esc(i.label)} ${ptsFmt(i.pts)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`);
+  return (pf.overridden ? `<span class="v">ידני. אוטומטי: ${ptsFmt(pf.auto.total)}</span> · ` : '') + parts.join(' · ');
+}
+
+let last = null;
+function calc() {
+  const input = buildInput();
+  const r = E.computeSpread(input);
+  const byYear = Object.fromEntries(r.lines.map(l => [l.year, l]));
+  for (const tr of $('ledger').tBodies[0].rows) {
+    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = pointsFor(y).value;
+    const t0 = E.netTax(d.base, y, pts, d.extra);
+    tr.querySelector('[data-o="br"]').innerHTML = breakdownHtml(y);
+    tr.querySelector('[data-o="t0"]').textContent = ils(t0);
+    tr.querySelector('[data-o="t1"]').textContent = l ? ils(l.t1) : '';
+    tr.querySelector('[data-o="add"]').textContent = l ? ils(l.add) : '';
+    tr.querySelector('[data-o="rate"]').textContent = l ? pct(l.rate) : '';
+  }
+  $('sumAlloc').textContent = ils(r.sumAlloc);
+  $('sumTax').textContent = ils(r.sumTax);
+  $('sumRate').textContent = pct(r.rate);
+  $('rRate').textContent = pct(r.rate);
+  $('rTax').textContent = ils(r.sumTax);
+  $('rNoSpread').textContent = ils(r.noSpread);
+  $('rSave').textContent = ils(r.saving);
+  $('rSave').className = 'v' + (r.saving >= 0 ? ' good' : '');
+  const errs = E.validate(input, state.type);
+  if (!input.lines.length) errs.unshift('לא הוגדרו שנים לייחוס.');
+  if (state.type === 'severance' && state.payYear - state.sevYears + 1 < E.MIN_YEAR)
+    errs.unshift('אין במחשבון מדרגות מס לשנים שלפני ' + E.MIN_YEAR + '. בחרו פחות שנים לפריסה.');
+  $('alert').hidden = !errs.length;
+  $('alert').innerHTML = errs.map(esc).join('<br>');
+  $('pdfBtn').disabled = errs.length > 0;
+  $('pdfBtn').title = errs.length ? 'יש לתקן את השגיאות לפני הפקת PDF' : '';
+  last = { input, r };
+  return last;
+}
+
+function applyType() {
+  const sev = state.type === 'severance';
+  $('sevWrap').hidden = !sev;
+  $('splitRow').hidden = sev;
+  $('typeNote').textContent = TYPE_NOTE[state.type];
+  if (sev) {
+    state.alloc = {};
+    for (const s of E.severanceYears(state.total, state.payYear, state.sevYears)) {
+      if (s.year >= E.MIN_YEAR) state.alloc[s.year] = s.alloc;
+    }
+  } else {
+    for (const y of Object.keys(state.alloc).map(Number)) if (y > state.payYear) delete state.alloc[y];
+  }
+  yearOptions($('fromYear'), Math.max(E.MIN_YEAR, state.payYear - 5), state.payYear);
+  yearOptions($('toYear'), state.payYear - 1 >= E.MIN_YEAR ? state.payYear - 1 : state.payYear, state.payYear);
+  renderLedger();
+}
+
+function split() {
+  let a = num($('fromYear').value), b = num($('toYear').value);
+  if (a > b) [a, b] = [b, a];
+  const n = b - a + 1, share = Math.floor(state.total / n);
+  state.alloc = {};
+  for (let y = a; y <= b; y++) state.alloc[y] = y === b ? state.total - share * (n - 1) : share;
+  renderLedger();
+}
+
+// ---- events ----
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
+  if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
+  if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
+  if (['gender', 'resident', 'singleParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
+    const p = state.profile;
+    p.gender = $('gender').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked;
+    p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
+    renderPointsOnly(); return;
+  }
+  const tr = t.closest('#ledger tr[data-y]');
+  if (tr) {
+    const y = +tr.dataset.y, f = t.dataset.f;
+    if (f === 'alloc') state.alloc[y] = num(t.value);
+    else if (f === 'base') yd(y).base = num(t.value);
+    else if (f === 'extra') yd(y).extra = num(t.value);
+    else if (f === 'pts') {
+      yd(y).ptsOverride = t.value.trim() === '' ? null : num(t.value);
+      t.classList.toggle('override', yd(y).ptsOverride != null);
+    }
+    calc();
+  }
+});
+// Points inputs show auto values; refresh them without rebuilding rows while the user types elsewhere.
+function renderPointsOnly() {
+  for (const y of years()) {
+    const el = $('pt' + y); if (!el || document.activeElement === el) continue;
+    const pf = pointsFor(y); el.value = ptsFmt(pf.value);
+  }
+  calc();
+}
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'payType') { state.type = t.value; applyType(); }
+  else if (t.id === 'payYear') { state.payYear = +t.value; applyType(); }
+  else if (t.id === 'sevYears') { state.sevYears = +t.value; applyType(); }
+  else if (t.dataset.f === 'pts' && t.value.trim() === '') { renderLedger(); }
+});
+document.addEventListener('focusout', e => {
+  const t = e.target;
+  if (t.matches('input.num') && t.inputMode === 'numeric' && !t.dataset.kid && !t.dataset.deg && t.value.trim() !== '') t.value = fmt(num(t.value));
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.delyear) { delete state.alloc[+t.dataset.delyear]; renderLedger(); }
+  else if (t.dataset.delkid) { state.profile.children.splice(+t.dataset.delkid, 1); renderKids(); renderPointsOnly(); }
+  else if (t.dataset.deldeg) { state.profile.degrees.splice(+t.dataset.deldeg, 1); renderDegrees(); renderPointsOnly(); }
+});
+$('addKid').addEventListener('click', () => { state.profile.children.push({ birthYear: state.payYear - 5, disabled: false }); renderKids(); renderPointsOnly(); });
+$('addDegree').addEventListener('click', () => { state.profile.degrees.push({ type: 'BA', year: state.payYear - 3, studyYears: 3 }); renderDegrees(); renderPointsOnly(); });
+$('addYear').addEventListener('click', () => {
+  const y = [...E.YEARS].reverse().find(y => y <= state.payYear && !(y in state.alloc));
+  if (y == null) return;
+  state.alloc[y] = 0; renderLedger();
+});
+$('splitBtn').addEventListener('click', split);
+
+// ---- reference tables ----
+$('brackets').innerHTML = E.YEARS.map(y => {
+  let prev = 0;
+  const rows = E.TAX[y].b.map(([cap, r]) => {
+    const s = `<tr><td>${fmt(prev ? prev + 1 : 0)}</td><td>${cap === Infinity ? 'ומעלה' : fmt(cap)}</td><td>${r}%</td></tr>`;
+    prev = cap; return s;
+  }).join('');
+  return `<table><caption>${y} · נקודת זיכוי ${fmt(E.TAX[y].cp)} ₪ לשנה (${fmt(E.TAX[y].cp / 12)} ₪ לחודש)</caption>
+    <thead><tr><th>מ-</th><th>עד</th><th>שיעור</th></tr></thead><tbody>${rows}</tbody></table>`;
+}).join('');
+
+// ---- PDF ----
+const TYPE_LABEL = { salary: 'הפרשי שכר', severance: 'פיצויים / מענק פרישה (החלק החייב)', other: 'הכנסה חד-פעמית אחרת' };
+function buildSheet() {
+  const { input, r } = calc();
+  const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
+  const rows = r.lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${ptsFmt(l.points)}</td><td>${fmt(l.extraCredit || 0)}</td>
+    <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
+  const ys = years();
+  const labels = [...new Set(ys.flatMap(y => pointsFor(y).auto.items.map(i => i.label)))];
+  const ptsRows = labels.map(lb => `<tr><td>${esc(lb)}</td>${ys.map(y => { const it = pointsFor(y).auto.items.find(i => i.label === lb); return `<td>${it ? ptsFmt(it.pts) : ''}</td>`; }).join('')}</tr>`).join('');
+  const ptsTotal = `<tr><td>סה"כ בחישוב</td>${ys.map(y => `<td>${ptsFmt(pointsFor(y).value)}${pointsFor(y).overridden ? '*' : ''}</td>`).join('')}</tr>`;
+  const anyOverride = ys.some(y => pointsFor(y).overridden);
+  $('sheet').innerHTML = `
+    <h1>חישוב פריסת מס – ייחוס הכנסה לשנים קודמות</h1>
+    <div class="subt">${TYPE_LABEL[state.type]} · שנת תשלום ${state.payYear}</div>
+    <div class="fields">
+      ${blank('שם הנישום')}${blank('מספר זהות')}
+      ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
+      ${blank('תאריך')}${blank('הוכן על ידי')}
+    </div>
+    <h3>נתוני התשלום</h3>
+    <div class="kv">
+      <span>סוג התשלום</span><b>${TYPE_LABEL[state.type]}</b>
+      <span>שנת התשלום</span><b>${state.payYear}</b>
+      <span>סכום חייב במס</span><b>${ils(input.total)}</b>
+      <span>סכום שיוחס לשנים</span><b>${ils(r.sumAlloc)}</b>
+    </div>
+    <h3>פירוט הייחוס לפי שנים (₪)</h3>
+    <table>
+      <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים נוספים</th>
+        <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td>סה"כ</td><td>${fmt(r.sumAlloc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(r.sumTax)}</td><td>${pct(r.rate)}</td></tr></tfoot>
+    </table>
+    <h3>פירוט נקודות זיכוי</h3>
+    <table>
+      <thead><tr><th>רכיב</th>${ys.map(y => `<th>${y}</th>`).join('')}</tr></thead>
+      <tbody>${ptsRows}</tbody><tfoot>${ptsTotal}</tfoot>
+    </table>
+    ${anyOverride ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}
+    <h3>סיכום</h3>
+    <div class="kv">
+      <span>סך המס על התשלום בפריסה</span><b>${ils(r.sumTax)}</b>
+      <span>שיעור מס לניכוי במקור (מקדמה)</span><b>${pct(r.rate)}</b>
+      <span>מס ללא פריסה (בשנת ${state.payYear})</span><b>${ils(r.noSpread)}</b>
+      <span>חיסכון מהפריסה</span><b>${ils(r.saving)}</b>
+    </div>
+    <div class="foot">החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.</div>
+    <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
+}
+
+$('pdfBtn').addEventListener('click', async () => {
+  const msg = $('pdfMsg'), btn = $('pdfBtn');
+  btn.disabled = true; msg.textContent = 'מכין PDF…';
+  try {
+    buildSheet();
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas($('sheet'), { scale: 2, backgroundColor: '#ffffff', logging: false });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const pw = 210, ph = 297, imgH = canvas.height * pw / canvas.width;
+    const img = canvas.toDataURL('image/jpeg', 0.95);
+    let y = 0;
+    do { if (y) pdf.addPage(); pdf.addImage(img, 'JPEG', 0, -y, pw, imgH); y += ph; } while (y < imgH - 1);
+    pdf.save(`פריסת-מס-${state.payYear}.pdf`);
+    msg.textContent = 'הקובץ הורד.';
+  } catch (err) {
+    msg.textContent = 'לא הצלחתי להפיק את הקובץ: ' + (err && err.message || err);
+  } finally { btn.disabled = false; calc(); }
+});
+
+// ---- init with example (marked as example in the header) ----
+$('total').value = fmt(state.total);
+yearOptions($('payYear'), state.payYear);
+$('sevYears').value = String(state.sevYears);
+for (const y of [2021, 2022, 2023, 2024, 2025, 2026]) yd(y).base = 150000;
+renderKids(); renderDegrees();
+applyType();
+split();
+</script>
+</body>
+</html>
