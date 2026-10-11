@@ -175,3 +175,23 @@ test('validation catches bad input', () => {
   assert.ok(v([{ year: 2025, alloc: 70, base: 0 }, { year: 2026, alloc: 30, base: 0 }], 'severance').length); // unequal
   assert.deepEqual(v([{ year: 2025, alloc: 50, base: 0 }, { year: 2026, alloc: 50, base: 0 }], 'severance'), []);
 });
+
+test('current-year certificate: forced credit = payroll tax (no spread) - spread tax', () => {
+  const lines = [2021, 2022, 2023, 2024, 2025].map(y => ({ year: y, alloc: 20000, base: 150000, points: 2.25 }));
+  const r = E.computeSpread({ total: 100000, payYear: 2026, lines, pay: { base: 150000, points: 2.25 } });
+  near(r.noSpread, 22420);          // payroll: 100,000 on top of 150,000 in 2026
+  near(r.sumTax, 20000);
+  near(r.forcedCredit, 2420);
+});
+
+test('refund report: prior-year share removed from report-year income and withheld tax', () => {
+  const lines = [{ year: 2024, alloc: 30000, base: 100000, points: 2.25 }, { year: 2025, alloc: 30000, base: 100000, points: 2.25 },
+    { year: 2026, alloc: 30000, base: 200000, points: 2.25 }];
+  const r = E.computeSpread({ total: 90000, payYear: 2026, lines, pay: { base: 200000, points: 2.25 } });
+  const a = E.refundAdjust(r, 2026, 290000, 60000);
+  assert.equal(a.prevIncome, 60000);
+  near(a.prevTax, r.lines[0].add + r.lines[1].add);
+  assert.equal(a.income, 230000);
+  near(a.tax, 60000 - a.prevTax);
+  assert.equal(E.refundAdjust(r, 2026, null, null).income, null);
+});

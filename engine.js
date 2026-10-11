@@ -153,7 +153,20 @@
     const sumTax = lines.reduce((s, l) => s + l.add, 0);
     const py = input.pay;
     const noSpread = netTax(py.base + input.total, input.payYear, py.points, py.extraCredit) - netTax(py.base, input.payYear, py.points, py.extraCredit);
-    return { lines, sumAlloc, sumTax, rate: sumAlloc ? sumTax / sumAlloc : NaN, noSpread, saving: noSpread - sumTax };
+    // Payroll computes the payment as ordinary current-year income (= noSpread). The forced credit
+    // ("זיכוי מאולץ") closes the gap to the tax actually due under the spread.
+    return { lines, sumAlloc, sumTax, rate: sumAlloc ? sumTax / sumAlloc : NaN, noSpread, forcedCredit: noSpread - sumTax };
+  }
+
+  // Refund report for the payment year: move the prior-year share out of that year's income and withheld tax.
+  function refundAdjust(spread, payYear, income106, tax106) {
+    const prev = spread.lines.filter(l => l.year < payYear);
+    const prevIncome = prev.reduce((s, l) => s + l.alloc, 0), prevTax = prev.reduce((s, l) => s + l.add, 0);
+    return {
+      prevIncome, prevTax,
+      income: income106 == null ? null : income106 - prevIncome,
+      tax: tax106 == null ? null : tax106 - prevTax,
+    };
   }
 
   function validate(input, type) {
@@ -179,6 +192,6 @@
     return errs;
   }
 
-  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, severanceYears, computeSpread, validate };
+  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, severanceYears, computeSpread, refundAdjust, validate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TaxEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

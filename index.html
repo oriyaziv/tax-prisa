@@ -65,6 +65,8 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .ptsbreak{font-size:.75rem;color:var(--muted);white-space:normal;min-width:190px;max-width:240px;line-height:1.4;margin-top:4px}
 .ptsbreak .v{color:var(--warn)}
 .note{font-size:.85rem;color:var(--muted);margin:0}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:.9rem}
+.adj{max-width:560px}
 .alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .stat{border:1px solid var(--line);border-radius:8px;padding:12px}
@@ -92,6 +94,9 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 #sheet .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 18px}
 #sheet .kv b{font-weight:600}
 #sheet .foot{margin-top:16px;font-size:10px;color:#444}
+#sheet .adjt{width:auto;min-width:60%}
+#sheet .adjt td:first-child{font-weight:500}
+#sheet i.fill{display:inline-block;width:110px;border-bottom:1px solid #111;height:14px}
 #sheet .sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:30px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -186,17 +191,45 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
   <section class="panel">
     <h2>תוצאה</h2>
     <div class="summary">
-      <div class="stat key"><div class="k">שיעור מס לניכוי (מקדמה)</div><div class="v" id="rRate"></div></div>
+      <div class="stat key"><div class="k">מקדמת מס (שיעור)</div><div class="v" id="rRate"></div></div>
+      <div class="stat"><div class="k">מקדמת מס (₪)</div><div class="v" id="rTax"></div></div>
       <div class="stat"><div class="k">סה"כ הכנסה שמיוחסת לשנים קודמות</div><div class="v" id="rPrevInc"></div></div>
       <div class="stat"><div class="k">סה"כ מס שמיוחס לשנים קודמות</div><div class="v" id="rPrevTax"></div></div>
-      <div class="stat"><div class="k">מס ללא פריסה (הכל בשנת התשלום)</div><div class="v" id="rNoSpread"></div></div>
     </div>
     <p class="note" id="payPart" hidden></p>
-    <div class="actions">
-      <button id="pdfBtn" type="button" class="primary">הפק PDF</button>
-      <span id="pdfMsg" role="status"></span>
+    <div id="warn" class="warnbox" hidden></div>
+    <p class="note">בכל קובץ PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
+    <span id="pdfMsg" role="status" class="note"></span>
+  </section>
+
+  <section class="panel">
+    <h2>אישור לשנה שוטפת</h2>
+    <p class="note">מערכת השכר מחשבת את התשלום כהכנסה רגילה של השנה השוטפת. הזיכוי המאולץ הוא הפער בין המס שהמערכת תחשב לבין המס לפי הפריסה. ההכנסה השוטפת נלקחת מהשורה של שנת התשלום בטבלה.</p>
+    <div class="summary">
+      <div class="stat"><div class="k">סך הסכום שנפרס</div><div class="v" id="cTotal"></div></div>
+      <div class="stat"><div class="k">מס שתחשב מערכת השכר (בלי פריסה)</div><div class="v" id="cSystem"></div></div>
+      <div class="stat"><div class="k">מקדמת מס לפי הפריסה</div><div class="v" id="cDue"></div></div>
+      <div class="stat key"><div class="k">זיכוי מאולץ (₪)</div><div class="v" id="cForced"></div></div>
     </div>
-    <p class="note">ב-PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
+    <div class="actions"><button id="pdfCert" type="button" class="primary">PDF – אישור לשנה שוטפת</button></div>
+  </section>
+
+  <section class="panel">
+    <h2>דוח החזר מס – שנת הדוח <span id="rfYear"></span></h2>
+    <p class="note">ההכנסה והמס שמיוחסים לשנים קודמות מופחתים מההכנסה ומהמס שנוכה בשנת הדוח. אם השדות נשארים ריקים, השורות ב-PDF יישארו למילוי ידני.</p>
+    <div class="grid">
+      <label>הכנסה חייבת בשנת הדוח לפי 106, כולל התשלום (₪)<input id="inc106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
+      <label>מס שנוכה בשנת הדוח לפי 106 (₪)<input id="tax106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
+    </div>
+    <div class="scroll"><table class="adj">
+      <thead><tr><th></th><th>הכנסה</th><th>מס</th></tr></thead>
+      <tbody>
+        <tr><td>לפי 106</td><td id="aInc106"></td><td id="aTax106"></td></tr>
+        <tr><td>בניכוי המיוחס לשנים קודמות</td><td id="aPrevInc"></td><td id="aPrevTax"></td></tr>
+      </tbody>
+      <tfoot><tr><td>לדיווח בשנת הדוח</td><td id="aInc"></td><td id="aTax"></td></tr></tfoot>
+    </table></div>
+    <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
   </section>
 
 </div>
@@ -226,10 +259,11 @@ const TYPE_NOTE = {
 const state = {
   type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
   profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
+  refund: { inc106: null, tax106: null },
   alloc: {},   // year -> amount
   data: {},    // year -> { base, extra, ptsOverride }
 };
-const yd = y => (state.data[y] ||= { base: 0, extra: 0, ptsOverride: null });
+const yd = y => (state.data[y] ||= { base: null, extra: 0, ptsOverride: null }); // base null = not entered (counts as 0)
 
 function years() {
   const s = new Set(Object.keys(state.alloc).map(Number));
@@ -244,10 +278,10 @@ function pointsFor(y) {
 
 function buildInput() {
   const lines = Object.keys(state.alloc).map(Number).sort((a, b) => a - b).map(y => ({
-    year: y, alloc: state.alloc[y], base: yd(y).base, points: pointsFor(y).value, extraCredit: yd(y).extra,
+    year: y, alloc: state.alloc[y], base: yd(y).base || 0, points: pointsFor(y).value, extraCredit: yd(y).extra,
   }));
   const p = yd(state.payYear);
-  return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base, points: pointsFor(state.payYear).value, extraCredit: p.extra } };
+  return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base || 0, points: pointsFor(state.payYear).value, extraCredit: p.extra } };
 }
 
 // ---- rendering ----
@@ -281,7 +315,7 @@ function renderLedger() {
     return `<tr data-y="${y}" class="${y === state.payYear ? 'payrow' : ''}">
       <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
       <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
-      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base ? fmt(d.base) : ''}" placeholder="0"></td>
+      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן"></td>
       <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
         <div class="ptsbreak" data-o="br"></div></td>
       <td><input class="num" id="ex${y}" data-f="extra" inputmode="numeric" value="${d.extra ? fmt(d.extra) : ''}" placeholder="0"></td>
@@ -304,7 +338,7 @@ function calc() {
   const byYear = Object.fromEntries(r.lines.map(l => [l.year, l]));
   for (const tr of $('ledger').tBodies[0].rows) {
     const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = pointsFor(y).value;
-    const t0 = E.netTax(d.base, y, pts, d.extra);
+    const t0 = E.netTax(d.base || 0, y, pts, d.extra);
     tr.querySelector('[data-o="br"]').innerHTML = breakdownHtml(y);
     tr.querySelector('[data-o="t0"]').textContent = ils(t0);
     tr.querySelector('[data-o="t1"]').textContent = l ? ils(l.t1) : '';
@@ -320,16 +354,38 @@ function calc() {
   $('rPrevTax').textContent = ils(prev.reduce((s, l) => s + l.add, 0));
   $('payPart').hidden = !cur;
   if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
-  $('rNoSpread').textContent = ils(r.noSpread);
+  $('rTax').textContent = ils(r.sumTax);
+  // current-year certificate
+  $('cTotal').textContent = ils(r.sumAlloc);
+  $('cSystem').textContent = ils(r.noSpread);
+  $('cDue').textContent = `${ils(r.sumTax)} · ${pct(r.rate)}`;
+  $('cForced').textContent = ils(Math.max(0, r.forcedCredit));
+  // refund report
+  const adj = E.refundAdjust(r, state.payYear, state.refund.inc106, state.refund.tax106);
+  const opt = v => v == null ? '—' : ils(v);
+  $('rfYear').textContent = state.payYear;
+  $('aInc106').textContent = opt(state.refund.inc106); $('aTax106').textContent = opt(state.refund.tax106);
+  $('aPrevInc').textContent = ils(adj.prevIncome); $('aPrevTax').textContent = ils(adj.prevTax);
+  $('aInc').textContent = opt(adj.income); $('aTax').textContent = opt(adj.tax);
+  // non-blocking warnings
+  const warns = [];
+  const missing = input.lines.filter(l => l.year !== state.payYear && yd(l.year).base == null).map(l => l.year);
+  if (missing.length) warns.push(`בשנים ${missing.join(', ')} לא הוזנה הכנסה חייבת. החישוב מניח 0. אם באמת לא הייתה הכנסה, הזינו 0.`);
+  if (yd(state.payYear).base == null) warns.push(`לא הוזנה הכנסה חייבת לשנת התשלום ${state.payYear}. היא נדרשת לחישוב הזיכוי המאולץ באישור לשנה שוטפת.`);
+  if (r.forcedCredit < 0) warns.push(`המס לפי הפריסה (${ils(r.sumTax)}) גבוה מהמס בלי פריסה (${ils(r.noSpread)}). הפריסה אינה מקטינה את המס, ולכן אין זיכוי מאולץ.`);
+  $('warn').hidden = !warns.length;
+  $('warn').innerHTML = warns.map(esc).join('<br>');
   const errs = E.validate(input, state.type);
   if (!input.lines.length) errs.unshift('לא הוגדרו שנים לייחוס.');
   if (state.type === 'severance' && state.payYear - state.sevYears + 1 < E.MIN_YEAR)
     errs.unshift('אין במחשבון מדרגות מס לשנים שלפני ' + E.MIN_YEAR + '. בחרו פחות שנים לפריסה.');
   $('alert').hidden = !errs.length;
   $('alert').innerHTML = errs.map(esc).join('<br>');
-  $('pdfBtn').disabled = errs.length > 0;
-  $('pdfBtn').title = errs.length ? 'יש לתקן את השגיאות לפני הפקת PDF' : '';
-  last = { input, r };
+  for (const id of ['pdfCert', 'pdfRefund']) {
+    $(id).disabled = errs.length > 0;
+    $(id).title = errs.length ? 'יש לתקן את השגיאות לפני הפקת PDF' : '';
+  }
+  last = { input, r, adj };
   return last;
 }
 
@@ -363,6 +419,7 @@ function split() {
 // ---- events ----
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
@@ -377,7 +434,7 @@ document.addEventListener('input', e => {
   if (tr) {
     const y = +tr.dataset.y, f = t.dataset.f;
     if (f === 'alloc') state.alloc[y] = num(t.value);
-    else if (f === 'base') yd(y).base = num(t.value);
+    else if (f === 'base') yd(y).base = t.value.trim() === '' ? null : num(t.value);
     else if (f === 'extra') yd(y).extra = num(t.value);
     else if (f === 'pts') {
       yd(y).ptsOverride = t.value.trim() === '' ? null : num(t.value);
@@ -430,21 +487,28 @@ $('splitBtn').addEventListener('click', split);
 
 // ---- PDF ----
 const TYPE_LABEL = { salary: 'הפרשי שכר', severance: 'פיצויים / מענק פרישה (החלק החייב)', other: 'הכנסה חד-פעמית אחרת' };
-function buildSheet() {
-  const { input, r } = calc();
-  const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
-  const rows = r.lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${ptsFmt(l.points)}</td><td>${fmt(l.extraCredit || 0)}</td>
+const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
+const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.';
+
+function yearsTable(lines, totalLabel) {
+  const rows = lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${ptsFmt(l.points)}${pointsFor(l.year).overridden ? '*' : ''}</td><td>${fmt(l.extraCredit || 0)}</td>
     <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
-  const ys = years();
-  const labels = [...new Set(ys.flatMap(y => pointsFor(y).auto.items.map(i => i.label)))];
-  const ptsRows = labels.map(lb => `<tr><td>${esc(lb)}</td>${ys.map(y => { const it = pointsFor(y).auto.items.find(i => i.label === lb); return `<td>${it ? ptsFmt(it.pts) : ''}</td>`; }).join('')}</tr>`).join('');
-  const ptsTotal = `<tr><td>סה"כ בחישוב</td>${ys.map(y => `<td>${ptsFmt(pointsFor(y).value)}${pointsFor(y).overridden ? '*' : ''}</td>`).join('')}</tr>`;
-  const anyOverride = ys.some(y => pointsFor(y).overridden);
-  const prevL = r.lines.filter(l => l.year < state.payYear), cur = r.lines.find(l => l.year === state.payYear);
-  const prevInc = prevL.reduce((s, l) => s + l.alloc, 0), prevTax = prevL.reduce((s, l) => s + l.add, 0);
+  const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
+  return `<table>
+    <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים נוספים</th>
+      <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td>${totalLabel}</td><td>${fmt(inc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(tax)}</td><td>${pct(inc ? tax / inc : NaN)}</td></tr></tfoot>
+  </table>${lines.some(l => pointsFor(l.year).overridden) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}`;
+}
+
+function buildRefundSheet() {
+  const { input, r, adj } = calc();
+  const prev = r.lines.filter(l => l.year < state.payYear), cur = r.lines.find(l => l.year === state.payYear);
+  const opt = v => v == null ? '<i class="fill"></i>' : fmt(v);
   $('sheet').innerHTML = `
-    <h1>חישוב פריסת מס – ייחוס הכנסה לשנים קודמות</h1>
-    <div class="subt">${TYPE_LABEL[state.type]} · שנת תשלום ${state.payYear}</div>
+    <h1>ייחוס הכנסה לשנים קודמות – נתונים לדוח החזר מס</h1>
+    <div class="subt">${TYPE_LABEL[state.type]} · שנת הדוח ${state.payYear}</div>
     <div class="fields">
       ${blank('שם הנישום')}${blank('מספר זהות')}
       ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
@@ -453,41 +517,77 @@ function buildSheet() {
     <h3>נתוני התשלום</h3>
     <div class="kv">
       <span>סוג התשלום</span><b>${TYPE_LABEL[state.type]}</b>
-      <span>שנת התשלום</span><b>${state.payYear}</b>
+      <span>שנת התשלום (שנת הדוח)</span><b>${state.payYear}</b>
       <span>סכום חייב במס</span><b>${ils(input.total)}</b>
-      <span>סכום שיוחס לשנים</span><b>${ils(r.sumAlloc)}</b>
     </div>
-    <h3>פירוט הייחוס לפי שנים (₪)</h3>
-    <table>
-      <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים נוספים</th>
-        <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr><td>סה"כ</td><td>${fmt(r.sumAlloc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(r.sumTax)}</td><td>${pct(r.rate)}</td></tr></tfoot>
-    </table>
-    <h3>פירוט נקודות זיכוי</h3>
-    <table>
-      <thead><tr><th>רכיב</th>${ys.map(y => `<th>${y}</th>`).join('')}</tr></thead>
-      <tbody>${ptsRows}</tbody><tfoot>${ptsTotal}</tfoot>
-    </table>
-    ${anyOverride ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}
-    <h3>סיכום</h3>
+    <h3>ייחוס לשנים קודמות (₪)</h3>
+    ${yearsTable(prev, 'סה"כ לשנים קודמות')}
+    ${cur ? `<div class="foot">חלק שנשאר בשנת הדוח ${state.payYear}: ${ils(cur.alloc)}. הוא נשאר בהכנסה של שנת הדוח ואינו מופחת.</div>` : ''}
+    <h3>סיכום הייחוס לשנים קודמות</h3>
     <div class="kv">
-      <span>סה"כ הכנסה שמיוחסת לשנים קודמות</span><b>${ils(prevInc)}</b>
-      <span>סה"כ מס שמיוחס לשנים קודמות</span><b>${ils(prevTax)}</b>
-      ${cur ? `<span>מיוחס לשנת התשלום ${state.payYear}</span><b>הכנסה ${ils(cur.alloc)} · מס ${ils(cur.add)}</b>` : ''}
-      <span>סך המס על התשלום בפריסה</span><b>${ils(r.sumTax)}</b>
-      <span>שיעור מס לניכוי במקור (מקדמה)</span><b>${pct(r.rate)}</b>
-      <span>מס ללא פריסה (בשנת ${state.payYear})</span><b>${ils(r.noSpread)}</b>
+      <span>סה"כ הכנסה שמיוחסת לשנים קודמות</span><b>${ils(adj.prevIncome)}</b>
+      <span>סה"כ מס שמיוחס לשנים קודמות</span><b>${ils(adj.prevTax)}</b>
     </div>
-    <div class="foot">החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.</div>
+    <h3>התאמות לשנת הדוח ${state.payYear} (₪)</h3>
+    <table class="adjt">
+      <thead><tr><th></th><th>הכנסה חייבת</th><th>מס שנוכה</th></tr></thead>
+      <tbody>
+        <tr><td>לפי טופס 106</td><td>${opt(state.refund.inc106)}</td><td>${opt(state.refund.tax106)}</td></tr>
+        <tr><td>בניכוי המיוחס לשנים קודמות</td><td>${fmt(adj.prevIncome)}</td><td>${fmt(adj.prevTax)}</td></tr>
+      </tbody>
+      <tfoot><tr><td>לדיווח בשנת הדוח</td><td>${opt(adj.income)}</td><td>${opt(adj.tax)}</td></tr></tfoot>
+    </table>
+    <div class="foot">${FOOT}</div>
     <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
+  return `פריסה-דוח-החזר-${state.payYear}.pdf`;
 }
 
-$('pdfBtn').addEventListener('click', async () => {
-  const msg = $('pdfMsg'), btn = $('pdfBtn');
+function buildCertSheet() {
+  const { input, r } = calc();
+  const ys = r.lines.map(l => l.year);
+  $('sheet').innerHTML = `
+    <h1>אישור פריסת מס לשנה השוטפת – שנת ${state.payYear}</h1>
+    <div class="subt">${TYPE_LABEL[state.type]}</div>
+    <div class="fields">
+      ${blank('שם הנישום')}${blank('מספר זהות')}
+      ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
+      ${blank('תאריך')}${blank('הוכן על ידי')}
+    </div>
+    <h3>פרטי הפריסה</h3>
+    <div class="kv">
+      <span>סוג התשלום</span><b>${TYPE_LABEL[state.type]}</b>
+      <span>סך הסכום שנפרס</span><b>${ils(r.sumAlloc)}</b>
+      <span>שנות הפריסה</span><b>${ys.length ? ys[0] + '–' + ys[ys.length - 1] + ` (${ys.length} שנים)` : ''}</b>
+    </div>
+    <h3>מקדמת מס</h3>
+    <table class="adjt">
+      <tbody>
+        <tr><td>סך המס לתשלום לפי הפריסה (מקדמת מס)</td><td>${ils(r.sumTax)}</td></tr>
+        <tr><td>מקדמת מס באחוזים מהסכום שנפרס</td><td>${pct(r.rate)}</td></tr>
+      </tbody>
+    </table>
+    <h3>זיכוי מאולץ למערכת השכר</h3>
+    <table class="adjt">
+      <tbody>
+        <tr><td>הכנסה שוטפת בשנת ${state.payYear} (בלי התשלום)</td><td>${ils(input.pay.base)}</td></tr>
+        <tr><td>מס על התשלום כהכנסה שוטפת, בלי פריסה</td><td>${ils(r.noSpread)}</td></tr>
+        <tr><td>בניכוי מקדמת המס לפי הפריסה</td><td>${ils(r.sumTax)}</td></tr>
+      </tbody>
+      <tfoot><tr><td>זיכוי מאולץ</td><td>${ils(Math.max(0, r.forcedCredit))}</td></tr></tfoot>
+    </table>
+    ${r.forcedCredit < 0 ? '<div class="foot">המס לפי הפריסה גבוה מהמס בלי פריסה. אין זיכוי מאולץ.</div>' : ''}
+    <h3>פירוט לפי שנים (₪)</h3>
+    ${yearsTable(r.lines, 'סה"כ')}
+    <div class="foot">${FOOT}</div>
+    <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
+  return `אישור-פריסה-${state.payYear}.pdf`;
+}
+
+async function makePdf(btn, build) {
+  const msg = $('pdfMsg');
   btn.disabled = true; msg.textContent = 'מכין PDF…';
   try {
-    buildSheet();
+    const filename = build();
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
     const canvas = await html2canvas($('sheet'), { scale: 2, backgroundColor: '#ffffff', logging: false });
     const { jsPDF } = window.jspdf;
@@ -496,12 +596,14 @@ $('pdfBtn').addEventListener('click', async () => {
     const img = canvas.toDataURL('image/jpeg', 0.95);
     let y = 0;
     do { if (y) pdf.addPage(); pdf.addImage(img, 'JPEG', 0, -y, pw, imgH); y += ph; } while (y < imgH - 1);
-    pdf.save(`פריסת-מס-${state.payYear}.pdf`);
+    pdf.save(filename);
     msg.textContent = 'הקובץ הורד.';
   } catch (err) {
     msg.textContent = 'לא הצלחתי להפיק את הקובץ: ' + (err && err.message || err);
-  } finally { btn.disabled = false; calc(); }
-});
+  } finally { calc(); }
+}
+$('pdfCert').addEventListener('click', e => makePdf(e.currentTarget, buildCertSheet));
+$('pdfRefund').addEventListener('click', e => makePdf(e.currentTarget, buildRefundSheet));
 
 // ---- init with example (marked as example in the header) ----
 $('total').value = fmt(state.total);
