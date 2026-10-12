@@ -74,6 +74,10 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .mode b{display:block;font-size:1.05rem}
 .mode small{display:block;color:var(--muted);font-size:.83rem}
 .mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.credrow td{background:var(--bg);white-space:normal}
+.crform{display:grid;gap:10px;padding-block:6px;position:sticky;right:0;max-width:min(860px,calc(100vw - 80px))}
+.crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.crbtn{font-variant-numeric:tabular-nums;color:var(--ink)}
 .alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .stat{border:1px solid var(--line);border-radius:8px;padding:12px}
@@ -194,11 +198,11 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
       <button id="splitBtn" type="button">חלק בשווה לשנים אלה</button>
       <button id="addYear" type="button" class="ghost">+ הוסף שנה</button>
     </div>
-    <p class="note">הכנסה חייבת: מטופס 106 של אותה שנה, בלי התשלום. זיכויים נוספים (₪): הזיכויים בשקלים לאותה שנה, כמו הפקדות לפנסיה ולביטוח, תרומות וישוב מזכה. אם בשנה מסוימת לא הייתה הכנסה, הזינו 0. נקודות הזיכוי שלא נוצלו יקוזזו מהמס על הסכום המיוחס. שורת שנת התשלום משמשת גם להשוואה למצב ללא פריסה.</p>
+    <p class="note">הכנסה חייבת: מטופס 106 של אותה שנה, בלי התשלום. זיכויים (₪): לחצו על הסכום כדי לפתוח את פירוט הזיכויים של אותה שנה (יישוב מזכה, אילת, פנסיה, ביטוח חיים, תרומות, משמרות). אם בשנה מסוימת לא הייתה הכנסה, הזינו 0. נקודות הזיכוי שלא נוצלו יקוזזו מהמס על הסכום המיוחס. שורת שנת התשלום משמשת גם להשוואה למצב ללא פריסה.</p>
     <div class="scroll">
       <table id="ledger">
         <thead><tr>
-          <th>שנת מס</th><th>סכום מיוחס (₪)</th><th>הכנסה חייבת (₪)</th><th>נקודות זיכוי</th><th>זיכויים נוספים (₪)</th>
+          <th>שנת מס</th><th>סכום מיוחס (₪)</th><th>הכנסה חייבת (₪)</th><th>נקודות זיכוי</th><th>זיכויים (₪)</th>
           <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על הסכום המיוחס</th><th>שיעור</th><th></th>
         </tr></thead>
         <tbody></tbody>
@@ -284,9 +288,9 @@ const state = {
   profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
   refund: { inc106: null, tax106: null },
   alloc: {},   // year -> amount
-  data: {},    // year -> { base, extra, ptsOverride }
+  data: {},    // year -> { base, cr (credit inputs), ptsOverride }
 };
-const yd = y => (state.data[y] ||= { base: null, extra: 0, ptsOverride: null }); // base null = not entered (counts as 0)
+const yd = y => (state.data[y] ||= { base: null, cr: {}, ptsOverride: null }); // base null = not entered (counts as 0)
 
 function years() {
   const s = new Set(Object.keys(state.alloc).map(Number));
@@ -299,12 +303,14 @@ function pointsFor(y) {
   return { auto, value: o == null ? auto.total : o, overridden: o != null };
 }
 
+function creditsFor(y) { return E.shekelCredits(y, yd(y).base || 0, yd(y).cr); }
+
 function buildInput() {
   const lines = Object.keys(state.alloc).map(Number).sort((a, b) => a - b).map(y => ({
-    year: y, alloc: state.alloc[y], base: yd(y).base || 0, points: pointsFor(y).value, extraCredit: yd(y).extra,
+    year: y, alloc: state.alloc[y], base: yd(y).base || 0, points: pointsFor(y).value, extraCredit: creditsFor(y).total,
   }));
   const p = yd(state.payYear);
-  return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base || 0, points: pointsFor(state.payYear).value, extraCredit: p.extra } };
+  return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base || 0, points: pointsFor(state.payYear).value, extraCredit: creditsFor(state.payYear).total } };
 }
 
 // ---- rendering ----
@@ -341,11 +347,35 @@ function renderLedger() {
       <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן"></td>
       <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
         <div class="ptsbreak" data-o="br"></div></td>
-      <td><input class="num" id="ex${y}" data-f="extra" inputmode="numeric" value="${d.extra ? fmt(d.extra) : ''}" placeholder="0"></td>
+      <td><button type="button" class="ghost crbtn" data-cr="${y}" aria-expanded="false" aria-controls="crrow${y}"><span data-o="cr"></span> ▾</button>
+        <div class="ptsbreak" data-o="crbr"></div></td>
       <td data-o="t0"></td><td data-o="t1"></td><td data-o="add"></td><td data-o="rate"></td>
-      <td>${allocated && !sev ? `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר שנה">✕</button>` : ''}</td></tr>`;
+      <td>${allocated && !sev ? `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר שנה">✕</button>` : ''}</td></tr>
+    <tr class="credrow" id="crrow${y}" data-cy="${y}"${openCredits.has(y) ? '' : ' hidden'}><td colspan="10">${creditForm(y)}</td></tr>`;
   }).join('');
   calc();
+}
+
+const openCredits = new Set();
+const CR_FIELDS = [
+  ['settleRate', 'יישוב מזכה – שיעור (%)', 'decimal'], ['settleCeil', 'יישוב מזכה – תקרה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים בשנה', 'numeric'],
+  ['eilatIncome', 'אילת – הכנסה שהופקה באילת (₪)', 'numeric'],
+  ['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric'],
+  ['donation', 'תרומות (₪)', 'numeric'], ['shiftWage', 'שכר משמרות בתעשייה (₪)', 'numeric'], ['other', 'זיכוי אחר (₪)', 'numeric'],
+];
+function paramNote(y) {
+  const P = E.CREDIT_PARAMS[y] || {}, a = P.assumed || [];
+  const v = (k, txt) => P[k] == null ? `${txt}: לא בחומר` : `${txt}: ${fmt(P[k])}${a.includes(k) ? ' (הנחה)' : ''}`;
+  return [v('eilatCeil', 'תקרת אילת'), v('donationMin', 'תרומה מזערית'), v('shiftMax', 'זיכוי משמרות מרבי'), v('shiftCeil', 'תקרת הכנסה למשמרות')].join(' · ');
+}
+function creditForm(y) {
+  const cr = yd(y).cr;
+  return `<div class="crform">
+    <div class="crgrid">${CR_FIELDS.map(([k, label, mode]) => `<label>${label}<input class="num" id="cr${k}${y}" data-c="${k}" inputmode="${mode}"
+      value="${cr[k] == null ? '' : (mode === 'numeric' ? fmt(cr[k]) : cr[k])}" placeholder="${k === 'settleMonths' ? '12' : '0'}"></label>`).join('')}</div>
+    <p class="note">שווי הזיכויים מחושב על ההכנסה הרגילה של ${y}, ואינו משתנה בגלל הסכום המיוחס. פנסיה 35%, ביטוח חיים 25%, תרומות 35%, משמרות 15%, אילת 10%. ${paramNote(y)}.</p>
+    <div class="actions"><button type="button" class="ghost" data-crcopy="${y}">העתק את נתוני היישוב והאילת לכל השנים</button></div>
+  </div>`;
 }
 
 function breakdownHtml(y) {
@@ -359,9 +389,11 @@ function calc() {
   const input = buildInput();
   const r = E.computeSpread(input);
   const byYear = Object.fromEntries(r.lines.map(l => [l.year, l]));
-  for (const tr of $('ledger').tBodies[0].rows) {
-    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = pointsFor(y).value;
-    const t0 = E.netTax(d.base || 0, y, pts, d.extra);
+  for (const tr of $('ledger').tBodies[0].querySelectorAll('tr[data-y]')) {
+    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = pointsFor(y).value, cr = creditsFor(y);
+    const t0 = E.netTax(d.base || 0, y, pts, cr.total);
+    tr.querySelector('[data-o="cr"]').textContent = ils(cr.total);
+    tr.querySelector('[data-o="crbr"]').innerHTML = cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ');
     tr.querySelector('[data-o="br"]').innerHTML = breakdownHtml(y);
     tr.querySelector('[data-o="t0"]').textContent = ils(t0);
     tr.querySelector('[data-o="t1"]').textContent = l ? ils(l.t1) : '';
@@ -456,6 +488,12 @@ document.addEventListener('input', e => {
     p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
     renderPointsOnly(); return;
   }
+  if (t.dataset.c) {
+    const y = +t.closest('tr[data-cy]').dataset.cy;
+    const v = t.value.trim() === '' ? null : num(t.value);
+    if (v == null) delete yd(y).cr[t.dataset.c]; else yd(y).cr[t.dataset.c] = v;
+    calc(); return;
+  }
   const tr = t.closest('#ledger tr[data-y]');
   if (tr) {
     const y = +tr.dataset.y, f = t.dataset.f;
@@ -498,6 +536,20 @@ document.addEventListener('focusout', e => {
 });
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.cr) {
+    const y = +t.dataset.cr, row = $('crrow' + y);
+    row.hidden = !row.hidden; t.setAttribute('aria-expanded', String(!row.hidden));
+    if (row.hidden) openCredits.delete(y); else openCredits.add(y);
+    return;
+  }
+  if (t.dataset.crcopy) {
+    const src = yd(+t.dataset.crcopy).cr;
+    for (const y of years()) {
+      const cr = yd(y).cr;
+      for (const k of ['settleRate', 'settleCeil', 'settleMonths', 'eilatIncome']) { if (src[k] == null) delete cr[k]; else cr[k] = src[k]; }
+    }
+    renderLedger(); return;
+  }
   if (t.dataset.delyear) { delete state.alloc[+t.dataset.delyear]; renderLedger(); }
   else if (t.dataset.delkid) { state.profile.children.splice(+t.dataset.delkid, 1); renderKids(); renderPointsOnly(); }
   else if (t.dataset.deldeg) { state.profile.degrees.splice(+t.dataset.deldeg, 1); renderDegrees(); renderPointsOnly(); }
@@ -521,11 +573,21 @@ function yearsTable(lines, totalLabel) {
     <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
   const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
   return `<table>
-    <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים נוספים</th>
+    <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים</th>
       <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>${totalLabel}</td><td>${fmt(inc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(tax)}</td><td>${pct(inc ? tax / inc : NaN)}</td></tr></tfoot>
-  </table>${lines.some(l => pointsFor(l.year).overridden) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}`;
+  </table>${lines.some(l => pointsFor(l.year).overridden) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}${creditsTable(lines.map(l => l.year))}`;
+}
+
+function creditsTable(ys) {
+  const per = Object.fromEntries(ys.map(y => [y, creditsFor(y)]));
+  const labels = [...new Set(ys.flatMap(y => per[y].items.map(i => i.label)))];
+  if (!labels.length) return '';
+  const rows = labels.map(lb => `<tr><td>${esc(lb)}</td>${ys.map(y => { const it = per[y].items.find(i => i.label === lb); return `<td>${it ? fmt(it.amount) : ''}</td>`; }).join('')}</tr>`).join('');
+  return `<h3>פירוט זיכויים בשקלים (₪)</h3><table>
+    <thead><tr><th>זיכוי</th>${ys.map(y => `<th>${y}</th>`).join('')}</tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td>סה"כ</td>${ys.map(y => `<td>${fmt(per[y].total)}</td>`).join('')}</tr></tfoot></table>`;
 }
 
 function buildRefundSheet() {

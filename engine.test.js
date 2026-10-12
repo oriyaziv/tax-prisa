@@ -205,3 +205,45 @@ test('severance shares of years before 2020 stay in the payment year', () => {
   // payment year below the equal share is still an error
   assert.ok(E.validate({ total: 100000, payYear: 2021, lines: [{ year: 2020, alloc: 70000, base: 0 }, { year: 2021, alloc: 30000, base: 0 }] }, 'severance').length);
 });
+
+test('shekel credits: qualifying town (fixed, proportional to months)', () => {
+  near(E.shekelCredits(2025, 150000, { settleRate: 12, settleCeil: 213240 }).total, 18000);
+  near(E.shekelCredits(2025, 300000, { settleRate: 12, settleCeil: 213240 }).total, 25588.8);  // capped at ceiling
+  near(E.shekelCredits(2025, 150000, { settleRate: 12, settleCeil: 213240, settleMonths: 6 }).total, 9000);
+});
+
+test('shekel credits: Eilat 10% up to ceiling', () => {
+  near(E.shekelCredits(2023, 0, { eilatIncome: 100000 }).total, 10000);
+  near(E.shekelCredits(2023, 0, { eilatIncome: 400000 }).total, 25980);
+  near(E.shekelCredits(2020, 0, { eilatIncome: 400000 }).total, 24252);
+});
+
+test('shekel credits: pension 35%, life 25%', () => {
+  near(E.shekelCredits(2024, 150000, { pension: 9000, life: 1000 }).total, 3150 + 250);
+});
+
+test('shekel credits: donations minimum and 30% cap', () => {
+  near(E.shekelCredits(2024, 100000, { donation: 1000 }).total, 350);
+  near(E.shekelCredits(2024, 100000, { donation: 200 }).total, 0);        // not above 207
+  near(E.shekelCredits(2024, 10000, { donation: 5000 }).total, 0.35 * 3000);  // 30% of income
+});
+
+test('shekel credits: shift work 15%, ceiling and max', () => {
+  // 2024: ceiling 143,040, max 12,540. Salary 100,000 incl. 30,000 shift -> all eligible -> 4,500
+  near(E.shekelCredits(2024, 100000, { shiftWage: 30000 }).total, 4500);
+  // salary 160,000 incl. 30,000 shift: other 130,000 -> eligible 13,040 -> 1,956
+  near(E.shekelCredits(2024, 160000, { shiftWage: 30000 }).total, 1956);
+  // big shift wage hits max credit
+  near(E.shekelCredits(2024, 100000, { shiftWage: 100000 }).total, 12540);
+  // 2020: no params in material -> uncapped, flagged
+  const r = E.shekelCredits(2020, 100000, { shiftWage: 100000 });
+  near(r.total, 15000); assert.ok(r.items[0].verify);
+});
+
+test('shekel credits feed the spread as fixed credits', () => {
+  const cr = E.shekelCredits(2025, 150000, { settleRate: 12, settleCeil: 213240 }).total;  // 18,000
+  const r = E.computeSpread({ total: 20000, payYear: 2026,
+    lines: [{ year: 2025, alloc: 20000, base: 150000, points: 2.25, extraCredit: cr }], pay: { base: 0, points: 2.25 } });
+  // gross 150,000 = 19,392; credits 6,534 + 18,000 > gross -> t0 0; gross 170,000 = 23,392 -> t1 = 23,392 - 24,534 < 0 -> 0
+  near(r.sumTax, 0);
+});

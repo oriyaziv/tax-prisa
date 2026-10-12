@@ -133,6 +133,50 @@
     return { total, items };
   }
 
+  // ---------- Shekel credits (fixed per year, computed on the regular income) ----------
+  // Sources: "ניתוב שלב א'" 2023-2025 and the credits training booklet in the team knowledge base.
+  // null = not in the material (no limit applied). `assumed` = 2026 frozen at 2025 values.
+  const CREDIT_PARAMS = {
+    2020: { eilatCeil: 242520, donationMin: null, shiftMax: null,  shiftCeil: null },
+    2021: { eilatCeil: 241080, donationMin: null, shiftMax: null,  shiftCeil: null },
+    2022: { eilatCeil: 246840, donationMin: 190,  shiftMax: 11520, shiftCeil: 131520 },
+    2023: { eilatCeil: 259800, donationMin: 200,  shiftMax: 12120, shiftCeil: 138480 },
+    2024: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040 },
+    2025: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040, assumed: ['donationMin'] },
+    2026: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040, assumed: ['donationMin', 'shiftMax', 'shiftCeil'] },
+  };
+
+  // cr: { settleRate (%), settleCeil, settleMonths, eilatIncome, pension, life, donation, shiftWage, other }
+  function shekelCredits(year, income, cr) {
+    cr = cr || {};
+    const P = CREDIT_PARAMS[year] || {}, assumed = P.assumed || [];
+    const items = [];
+    const add = (label, amount, verify) => { if (amount > 0) items.push({ label, amount, verify: !!verify }); };
+    const inc = Math.max(0, income || 0);
+    // Qualifying town (סעיף 11): rate × min(income, ceiling), proportional to months of residence.
+    if (cr.settleRate && cr.settleCeil) {
+      const m = cr.settleMonths == null ? 12 : Math.max(0, Math.min(12, cr.settleMonths));
+      add('יישוב מזכה', cr.settleRate / 100 * Math.min(inc, cr.settleCeil) * m / 12);
+    }
+    // Eilat: 10% of income produced in Eilat, up to the annual ceiling.
+    if (cr.eilatIncome) add('אילת', 0.10 * Math.min(cr.eilatIncome, P.eilatCeil || Infinity));
+    // Pension (45א): 35%; life insurance: 25%; amounts are the qualifying deposits from form 106.
+    if (cr.pension) add('פנסיה', 0.35 * cr.pension);
+    if (cr.life) add('ביטוח חיים', 0.25 * cr.life);
+    // Donations (46): 35% above the yearly minimum, donation base capped at 30% of taxable income.
+    if (cr.donation && (P.donationMin == null || cr.donation > P.donationMin))
+      add('תרומות', 0.35 * Math.min(cr.donation, 0.30 * inc), P.donationMin == null || assumed.includes('donationMin'));
+    // Shift work in industry: 15% of the shift wage that, added to the salary, stays under the ceiling; capped.
+    if (cr.shiftWage) {
+      const other = Math.max(0, inc - cr.shiftWage);
+      const eligible = P.shiftCeil == null ? cr.shiftWage : Math.max(0, Math.min(cr.shiftWage, P.shiftCeil - other));
+      add('משמרות', Math.min(0.15 * eligible, P.shiftMax == null ? Infinity : P.shiftMax),
+        P.shiftMax == null || assumed.includes('shiftMax'));
+    }
+    if (cr.other) add('זיכוי אחר', cr.other);
+    return { total: items.reduce((s, i) => s + i.amount, 0), items };
+  }
+
   // ---------- Spread ----------
   // Severance backward spread: equal parts over n tax years ending in the payment year (n <= 6).
   // Shares of years before MIN_YEAR are not spread: they are added to the payment year.
@@ -202,6 +246,6 @@
     return errs;
   }
 
-  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, severanceYears, computeSpread, refundAdjust, validate };
+  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, CREDIT_PARAMS, shekelCredits, severanceYears, computeSpread, refundAdjust, validate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TaxEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
