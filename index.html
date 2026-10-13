@@ -634,8 +634,8 @@ function buildCertSheet() {
   const { input, r } = calc();
   const ys = r.lines.map(l => l.year);
   $('sheet').innerHTML = `
-    <h1>אישור תיאום מס – פריסת הכנסה, שנת ${state.payYear}</h1>
-    <div class="subt">${TYPE_LABEL[state.type]}</div>
+    <h1>אישור תיאום מס – פריסת הכנסה</h1>
+    <div class="subt">${TYPE_LABEL[state.type]} · שנת המס ${state.payYear}</div>
     <div class="fields">
       ${blank('שם הנישום')}${blank('מספר זהות')}
       ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
