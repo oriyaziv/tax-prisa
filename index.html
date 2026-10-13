@@ -345,6 +345,8 @@ function renderDegrees() {
       <option value="CERT"${d.type === 'CERT' ? ' selected' : ''}>תעודת מקצוע</option></select></label>
     <label>שנת סיום<input class="num" id="degy${i}" data-deg="${i}" data-f="year" inputmode="numeric" value="${d.year || ''}"></label>
     <label>שנות לימוד<input class="num" id="degs${i}" data-deg="${i}" data-f="studyYears" inputmode="numeric" value="${d.studyYears || ''}"></label>
+    <label>סיום התמחות (אם נדרשת)<input class="num" id="degi${i}" data-deg="${i}" data-f="internEnd" inputmode="numeric" value="${d.internEnd || ''}" placeholder="—"></label>
+    <label class="check" style="flex:0 1 auto"><input type="checkbox" id="degd${i}" data-deg="${i}" data-f="defer"${d.defer ? ' checked' : ''}> דחייה בשנה (בוגרי 2014–2022)</label>
     <button type="button" class="ghost" data-deldeg="${i}" aria-label="הסר">✕</button></div>`).join('') || '<p class="note">לא הוזנה השכלה.</p>';
 }
 
@@ -495,7 +497,7 @@ document.addEventListener('input', e => {
   if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
-  if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
+  if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (['gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'reserve2025', 'alimonyFrom', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     const p = state.profile;
     if (t.id === 'gender') $('childTable').value = t.value === 'F' ? 'A' : 'B';

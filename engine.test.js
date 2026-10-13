@@ -295,3 +295,40 @@ test('2026 children table (supplied) matches 2024-2025 rules', () => {
   assert.equal(E.childPoints(1, 2026, 'A', true), 5.5);
   assert.ok(!E.creditPoints({ children: [{ birthYear: 2020 }] }, 2026).items.find(i => i.label === 'ילדים').verify);
 });
+
+test('degrees and certificates (supplied table)', () => {
+  // BA: 2014-2022 one point, one year; 2023+ one point per study year up to 3
+  assert.equal(E.degreePoints({ type: 'BA', year: 2021 }, 2022), 1);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2021 }, 2023), 0);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2021, defer: true }, 2022), 0);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2021, defer: true }, 2023), 1);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 4 }, 2026), 1);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 4 }, 2027), 0);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 2 }, 2026), 0);
+  // MA: 2014-2022 0.5 one year; 2023+ 0.5 for two years
+  assert.equal(E.degreePoints({ type: 'MA', year: 2020 }, 2021), 0.5);
+  assert.equal(E.degreePoints({ type: 'MA', year: 2020 }, 2022), 0);
+  assert.equal(E.degreePoints({ type: 'MA', year: 2024, studyYears: 1 }, 2026), 0.5);
+  assert.equal(E.degreePoints({ type: 'MA', year: 2024 }, 2027), 0);
+  // Certificate by completion year
+  assert.equal(E.degreePoints({ type: 'CERT', year: 2015 }, 2016), 0.5);
+  assert.equal(E.degreePoints({ type: 'CERT', year: 2017 }, 2018), 0.75);
+  assert.equal(E.degreePoints({ type: 'CERT', year: 2020 }, 2021), 1);
+  assert.equal(E.degreePoints({ type: 'CERT', year: 2023, studyYears: 2 }, 2025), 1);
+  assert.equal(E.degreePoints({ type: 'CERT', year: 2023, studyYears: 2 }, 2026), 0);
+  // internship deferral
+  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021 }, 2021), 0);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021 }, 2022), 1);
+  // before 2014: none
+  assert.equal(E.degreePoints({ type: 'BA', year: 2012 }, 2013), 0);
+});
+
+test('degree combination rules', () => {
+  // BA + MA same year combine
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2023, studyYears: 3 }, { type: 'MA', year: 2024 }] }, 2025).total, 2.25 + 1.5);
+  // certificate does not combine: larger wins
+  const r = E.creditPoints({ degrees: [{ type: 'MA', year: 2024 }, { type: 'CERT', year: 2024, studyYears: 2 }] }, 2025);
+  near(r.total, 2.25 + 1); assert.ok(r.items.some(i => i.label === 'תעודת מקצוע'));
+  // only one BA counted
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2021 }, { type: 'BA', year: 2021 }] }, 2022).total, 3.25);
+});
