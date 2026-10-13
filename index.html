@@ -161,7 +161,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
         <option value="A">אישה, או הורה שמקבל קצבת ילדים</option></select></label>
       <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
       <label class="check"><input type="checkbox" id="loneParent"> חד הורי (נקודת זיכוי נוספת)</label>
-      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (נקודות הילדים משתי הטבלאות)</label>
+      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (שתי טבלאות הילדים + נקודה)</label>
     </div>
 
     <details class="sub" id="secKids">
@@ -181,6 +181,18 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
         <label>חודש שחרור<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
         <label class="check" style="flex:0 1 auto"><input type="checkbox" id="fullService" checked> שירות מלא (גבר 23 חודשים / אישה 22)</label>
       </div>
+    </details>
+
+    <details class="sub" id="secRes">
+      <summary>לוחם מילואים <span class="cnt" id="cntRes"></span></summary>
+      <div class="row"><label>ימי מילואים כלוחם ב-2025 (לשנת המס 2026)<input class="num" id="reserve2025" inputmode="numeric" placeholder="0"></label></div>
+      <p class="note">סעיף 39ב, הוראת שעה 2026–2027: 30–39 ימים 0.5 נקודה, 40–49 ימים 0.75, מ-50 ימים נקודה אחת ועוד 0.25 לכל 5 ימים נוספים, עד 4 נקודות.</p>
+    </details>
+
+    <details class="sub" id="secAlim">
+      <summary>מזונות לבן זוג לשעבר <span class="cnt" id="cntAlim"></span></summary>
+      <div class="row"><label>שנת הנישואין מחדש<input class="num" id="alimonyFrom" inputmode="numeric" placeholder="לא רלוונטי"></label></div>
+      <p class="note">נקודת זיכוי אחת לגרוש/ה שנישא/ה מחדש, כשהוא/היא או בן/בת הזוג משלמים מזונות לבן/בת הזוג לשעבר. ניתנת מהשנה שבה נישא/ה מחדש.</p>
     </details>
 
     <details class="sub" id="secDeg">
@@ -361,19 +373,22 @@ const CR_FIELDS = [
   ['settleRate', 'יישוב מזכה – שיעור (%)', 'decimal'], ['settleCeil', 'יישוב מזכה – תקרה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים בשנה', 'numeric'],
   ['eilatIncome', 'אילת – הכנסה שהופקה באילת (₪)', 'numeric'],
   ['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric'],
-  ['donation', 'תרומות (₪)', 'numeric'], ['shiftWage', 'שכר משמרות בתעשייה (₪)', 'numeric'], ['other', 'זיכוי אחר (₪)', 'numeric'],
+  ['donation', 'תרומות (₪)', 'numeric'], ['shiftWage', 'שכר משמרות בתעשייה (₪)', 'numeric'],
+  ['soldierSalary', 'חייל – משכורת מיוחדת (₪)', 'numeric'], ['soldierCeil', 'חייל – תקרה (₪)', 'numeric', y => E.CREDIT_PARAMS[y].soldierCeil == null],
+  ['other', 'זיכוי אחר (₪)', 'numeric'],
 ];
 function paramNote(y) {
   const P = E.CREDIT_PARAMS[y] || {}, a = P.assumed || [];
   const v = (k, txt) => P[k] == null ? `${txt}: לא בחומר` : `${txt}: ${fmt(P[k])}${a.includes(k) ? ' (הנחה)' : ''}`;
-  return [v('eilatCeil', 'תקרת אילת'), v('donationMin', 'תרומה מזערית'), v('shiftMax', 'זיכוי משמרות מרבי'), v('shiftCeil', 'תקרת הכנסה למשמרות')].join(' · ');
+  return [v('eilatCeil', 'תקרת אילת'), v('donationMin', 'תרומה מזערית'), v('shiftMax', 'זיכוי משמרות מרבי'), v('shiftCeil', 'תקרת הכנסה למשמרות'),
+    P.soldierCeil == null ? 'תקרת חייל: אין בחומר, הזינו בשדה' : v('soldierCeil', 'תקרת חייל')].join(' · ');
 }
 function creditForm(y) {
   const cr = yd(y).cr;
   return `<div class="crform">
-    <div class="crgrid">${CR_FIELDS.map(([k, label, mode]) => `<label>${label}<input class="num" id="cr${k}${y}" data-c="${k}" inputmode="${mode}"
+    <div class="crgrid">${CR_FIELDS.filter(f => !f[3] || f[3](y)).map(([k, label, mode]) => `<label>${label}<input class="num" id="cr${k}${y}" data-c="${k}" inputmode="${mode}"
       value="${cr[k] == null ? '' : (mode === 'numeric' ? fmt(cr[k]) : cr[k])}" placeholder="${k === 'settleMonths' ? '12' : '0'}"></label>`).join('')}</div>
-    <p class="note">שווי הזיכויים מחושב על ההכנסה הרגילה של ${y}, ואינו משתנה בגלל הסכום המיוחס. פנסיה 35%, ביטוח חיים 25%, תרומות 35%, משמרות 15%, אילת 10%. ${paramNote(y)}.</p>
+    <p class="note">שווי הזיכויים מחושב על ההכנסה הרגילה של ${y}, ואינו משתנה בגלל הסכום המיוחס. פנסיה 35%, ביטוח חיים 25%, תרומות 35%, משמרות 15%, אילת 10%, חייל 5% (במקום יישוב מזכה, הגבוה מביניהם). ${paramNote(y)}.</p>
     <div class="actions"><button type="button" class="ghost" data-crcopy="${y}">העתק את נתוני היישוב והאילת לכל השנים</button></div>
   </div>`;
 }
@@ -481,10 +496,11 @@ document.addEventListener('input', e => {
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : num(t.value); renderPointsOnly(); return; }
-  if (['gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
+  if (['gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'reserve2025', 'alimonyFrom', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     const p = state.profile;
     if (t.id === 'gender') $('childTable').value = t.value === 'F' ? 'A' : 'B';
     p.gender = $('gender').value; p.childTable = $('childTable').value; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked; p.loneParent = $('loneParent').checked;
+    p.reserveDays = { 2025: num($('reserve2025').value) }; p.alimonyFrom = num($('alimonyFrom').value) || null;
     p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
     renderPointsOnly(); return;
   }
@@ -513,6 +529,8 @@ function renderCounts() {
   $('cntKids').textContent = p.children.length ? `(${p.children.length})` : '';
   $('cntImm').textContent = p.immigrant ? `(${p.immigrant})` : '';
   $('cntSol').textContent = p.soldier && p.soldier.discharge ? `(${p.soldier.discharge})` : '';
+  $('cntRes').textContent = p.reserveDays && p.reserveDays[2025] ? `(${p.reserveDays[2025]} ימים)` : '';
+  $('cntAlim').textContent = p.alimonyFrom ? `(מ-${p.alimonyFrom})` : '';
   $('cntDeg').textContent = p.degrees.length ? `(${p.degrees.length})` : '';
 }
 function renderPointsOnly() {
@@ -532,7 +550,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('focusout', e => {
   const t = e.target;
-  if (t.matches('input.num') && t.inputMode === 'numeric' && !t.dataset.kid && !t.dataset.deg && t.value.trim() !== '') t.value = fmt(num(t.value));
+  if (t.matches('input.num') && t.inputMode === 'numeric' && !t.dataset.kid && !t.dataset.deg && t.id !== 'alimonyFrom' && t.value.trim() !== '') t.value = fmt(num(t.value));
 });
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;

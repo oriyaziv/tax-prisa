@@ -76,10 +76,12 @@ test('deferral of birth-year point (table A)', () => {
 
 test('single parent gets both tables cumulatively', () => {
   const sp = { gender: 'F', singleParent: true, children: [{ birthYear: 2016 }] };
-  // 2024: 2.25 + 0.5 + child age 8 (A 2 + B 1) = 5.75
+  // 2024: 2.25 + 0.5 + child age 8 (A 2 + B 1) + sole-parent point 1 = 6.75
   const r = E.creditPoints(sp, 2024);
   near(r.items.find(i => i.label === 'ילדים').pts, 3);
-  near(r.total, 5.75);
+  near(r.total, 6.75);
+  // both boxes ticked -> still one extra point
+  near(E.creditPoints(Object.assign({ loneParent: true }, sp), 2024).total, 6.75);
   // lone parent ("חד הורי"): one additional point
   near(E.creditPoints({ gender: 'F', loneParent: true }, 2024).total, 2.25 + 0.5 + 1);
   // childTable override: a man receiving the allowance uses table A
@@ -235,9 +237,9 @@ test('shekel credits: shift work 15%, ceiling and max', () => {
   near(E.shekelCredits(2024, 160000, { shiftWage: 30000 }).total, 1956);
   // big shift wage hits max credit
   near(E.shekelCredits(2024, 100000, { shiftWage: 100000 }).total, 12540);
-  // 2020: no params in material -> uncapped, flagged
-  const r = E.shekelCredits(2020, 100000, { shiftWage: 100000 });
-  near(r.total, 15000); assert.ok(r.items[0].verify);
+  // 2020: ceiling 129,120, max 11,340
+  near(E.shekelCredits(2020, 100000, { shiftWage: 100000 }).total, 11340);
+  near(E.shekelCredits(2021, 140000, { shiftWage: 30000 }).total, 0.15 * (128400 - 110000));
 });
 
 test('shekel credits feed the spread as fixed credits', () => {
@@ -246,4 +248,50 @@ test('shekel credits feed the spread as fixed credits', () => {
     lines: [{ year: 2025, alloc: 20000, base: 150000, points: 2.25, extraCredit: cr }], pay: { base: 0, points: 2.25 } });
   // gross 150,000 = 19,392; credits 6,534 + 18,000 > gross -> t0 0; gross 170,000 = 23,392 -> t1 = 23,392 - 24,534 < 0 -> 0
   near(r.sumTax, 0);
+});
+
+test('donation minimum 2020-2021 is 190', () => {
+  near(E.shekelCredits(2020, 100000, { donation: 180 }).total, 0);
+  near(E.shekelCredits(2021, 100000, { donation: 1000 }).total, 350);
+});
+
+test('special-salary soldier: 5% up to ceiling, better of soldier / qualifying town', () => {
+  near(E.shekelCredits(2024, 200000, { soldierSalary: 200000 }).total, 0.05 * 178320);
+  const r20 = E.shekelCredits(2020, 200000, { soldierSalary: 200000 });       // no ceiling in material
+  near(r20.total, 10000); assert.ok(r20.items[0].verify);
+  near(E.shekelCredits(2020, 200000, { soldierSalary: 200000, soldierCeil: 150000 }).total, 7500);
+  // town 7% x 146,642 = 10,264.94 > soldier 8,916 -> town kept
+  const a = E.shekelCredits(2024, 200000, { soldierSalary: 200000, settleRate: 7, settleCeil: 146642 });
+  near(a.total, 10264.94); assert.equal(a.items.length, 1);
+  // town 3% x 100,000 = 3,000 < soldier 8,916 -> soldier kept
+  const b = E.shekelCredits(2024, 200000, { soldierSalary: 200000, settleRate: 3, settleCeil: 100000 });
+  near(b.total, 8916); assert.equal(b.items.length, 1);
+});
+
+test('reserve combat points (2026+, by days in previous year)', () => {
+  assert.equal(E.reservePoints(29, 2026), 0);
+  assert.equal(E.reservePoints(30, 2026), 0.5);
+  assert.equal(E.reservePoints(45, 2026), 0.75);
+  assert.equal(E.reservePoints(50, 2026), 1);
+  assert.equal(E.reservePoints(64, 2026), 1.5);
+  assert.equal(E.reservePoints(200, 2026), 4);
+  assert.equal(E.reservePoints(80, 2025), 0);
+  near(E.creditPoints({ reserveDays: { 2025: 60 } }, 2026).total, 2.25 + 1.5);
+  near(E.creditPoints({ reserveDays: { 2025: 60 } }, 2025).total, 2.25);
+});
+
+test('alimony to former spouse: 1 point from year of remarriage', () => {
+  near(E.creditPoints({ alimonyFrom: 2023 }, 2022).total, 2.25);
+  near(E.creditPoints({ alimonyFrom: 2023 }, 2023).total, 3.25);
+  near(E.creditPoints({ alimonyFrom: 2023 }, 2026).total, 3.25);
+});
+
+test('2026 children table (supplied) matches 2024-2025 rules', () => {
+  const A = [2.5, 4.5, 4.5, 3.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0.5];
+  const B = [2.5, 4.5, 4.5, 3.5, 2.5, 2.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0];
+  A.forEach((v, age) => assert.equal(E.childPoints(age, 2026, 'A'), v, 'A age ' + age));
+  B.forEach((v, age) => assert.equal(E.childPoints(age, 2026, 'B'), v, 'B age ' + age));
+  assert.equal(E.childPoints(0, 2026, 'A', true), 1.5);
+  assert.equal(E.childPoints(1, 2026, 'A', true), 5.5);
+  assert.ok(!E.creditPoints({ children: [{ birthYear: 2020 }] }, 2026).items.find(i => i.label === 'ילדים').verify);
 });

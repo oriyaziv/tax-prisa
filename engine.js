@@ -107,6 +107,14 @@
 
   const DEGREE_LABEL = { BA: 'תואר ראשון', MA: 'תואר שני', CERT: 'תעודת מקצוע' };
 
+  // Reserve combat service (39ב, temporary order 2026-2027): points by days served in the previous year.
+  function reservePoints(days, year) {
+    if (year < 2026 || !days || days < 30) return 0;
+    if (days < 40) return 0.5;
+    if (days < 50) return 0.75;
+    return Math.min(4, 1 + 0.25 * Math.floor((days - 50) / 5));
+  }
+
   // profile: { gender:'M'|'F', childTable:'A'|'B' (default by gender), resident, children:[{birthYear, disabled, defer}], singleParent (both tables), loneParent (+1 point),
   //   immigrant:'YYYY-MM', soldier:{discharge:'YYYY-MM', full}, degrees:[{type, year, studyYears}] }
   function creditPoints(profile, year) {
@@ -123,12 +131,15 @@
       for (const t of tables) kids += childPoints(year - by, year, t, c.defer);
       if (c.disabled && year - by <= 18) disabled += 2;
     }
-    add('ילדים', kids, year > 2025); // table verified for 2020-2025; 2026 assumes the 2024-2025 rules
+    add('ילדים', kids); // tables supplied for 2020-2025 and 2026
     add('ילד נטול יכולת', disabled);
-    if (p.loneParent) add('חד הורי', 1);
+    // Sole parent: both tables plus one point (2026 table). A lone parent also gets one point; never twice.
+    if (p.singleParent || p.loneParent) add(p.singleParent ? 'הורה יחיד' : 'חד הורי', 1);
     add('עולה / תושב חוזר', immigrantPoints(p.immigrant, year));
     if (p.soldier) add('חייל משוחרר / שירות לאומי', soldierPoints(p.soldier.discharge, p.soldier.full, year));
     for (const d of p.degrees || []) add(DEGREE_LABEL[d.type] || 'השכלה', degreePoints(d, year), true);
+    add('לוחם מילואים', reservePoints((p.reserveDays || {})[year - 1], year));
+    if (p.alimonyFrom && year >= +p.alimonyFrom) add('מזונות לבן זוג לשעבר', 1);
     const total = Math.round(items.reduce((s, i) => s + i.pts, 0) * 10000) / 10000;
     return { total, items };
   }
@@ -137,16 +148,16 @@
   // Sources: "ניתוב שלב א'" 2023-2025 and the credits training booklet in the team knowledge base.
   // null = not in the material (no limit applied). `assumed` = 2026 frozen at 2025 values.
   const CREDIT_PARAMS = {
-    2020: { eilatCeil: 242520, donationMin: null, shiftMax: null,  shiftCeil: null },
-    2021: { eilatCeil: 241080, donationMin: null, shiftMax: null,  shiftCeil: null },
-    2022: { eilatCeil: 246840, donationMin: 190,  shiftMax: 11520, shiftCeil: 131520 },
-    2023: { eilatCeil: 259800, donationMin: 200,  shiftMax: 12120, shiftCeil: 138480 },
-    2024: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040 },
-    2025: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040, assumed: ['donationMin'] },
-    2026: { eilatCeil: 268560, donationMin: 207,  shiftMax: 12540, shiftCeil: 143040, assumed: ['donationMin', 'shiftMax', 'shiftCeil'] },
+    2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: null },
+    2021: { eilatCeil: 241080, donationMin: 190, shiftMax: 11280, shiftCeil: 128400, soldierCeil: null },
+    2022: { eilatCeil: 246840, donationMin: 190, shiftMax: 11520, shiftCeil: 131520, soldierCeil: 160080 },
+    2023: { eilatCeil: 259800, donationMin: 200, shiftMax: 12120, shiftCeil: 138480, soldierCeil: 160080 },
+    2024: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
+    2025: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
+    2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: null, assumed: ['donationMin'] },
   };
 
-  // cr: { settleRate (%), settleCeil, settleMonths, eilatIncome, pension, life, donation, shiftWage, other }
+  // cr: { settleRate (%), settleCeil, settleMonths, eilatIncome, pension, life, donation, shiftWage,\n  //       soldierSalary, soldierCeil (only where the year has no ceiling in the material), other }
   function shekelCredits(year, income, cr) {
     cr = cr || {};
     const P = CREDIT_PARAMS[year] || {}, assumed = P.assumed || [];
@@ -157,6 +168,16 @@
     if (cr.settleRate && cr.settleCeil) {
       const m = cr.settleMonths == null ? 12 : Math.max(0, Math.min(12, cr.settleMonths));
       add('יישוב מזכה', cr.settleRate / 100 * Math.min(inc, cr.settleCeil) * m / 12);
+    }
+    // Soldier with a special salary (11(ג)): 5% up to the ceiling. The taxpayer chooses either this
+    // or the qualifying-town credit, so only the larger of the two is kept.
+    if (cr.soldierSalary) {
+      const ceil = P.soldierCeil != null ? P.soldierCeil : cr.soldierCeil;
+      const soldier = 0.05 * Math.min(cr.soldierSalary, ceil || Infinity);
+      const town = items.find(i => i.label === 'יישוב מזכה');
+      if (!town) add('חייל – משכורת מיוחדת', soldier, !ceil);
+      else if (soldier > town.amount) { items.splice(items.indexOf(town), 1); add('חייל – משכורת מיוחדת (במקום יישוב)', soldier, !ceil); }
+      else town.label = 'יישוב מזכה (במקום חייל)';
     }
     // Eilat: 10% of income produced in Eilat, up to the annual ceiling.
     if (cr.eilatIncome) add('אילת', 0.10 * Math.min(cr.eilatIncome, P.eilatCeil || Infinity));
@@ -246,6 +267,6 @@
     return errs;
   }
 
-  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, CREDIT_PARAMS, shekelCredits, severanceYears, computeSpread, refundAdjust, validate };
+  const api = { TAX, YEARS, MIN_YEAR, MAX_YEAR, grossTax, netTax, childPoints, immigrantPoints, soldierPoints, degreePoints, creditPoints, reservePoints, CREDIT_PARAMS, shekelCredits, severanceYears, computeSpread, refundAdjust, validate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TaxEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
