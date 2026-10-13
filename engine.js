@@ -93,28 +93,32 @@
   }
 
   // Degrees: points start the tax year after completion.
-  // Degrees and professional certificates (40ג, 40ד) per the supplied summary table, by completion year.
+  // Degrees and professional certificates (40ג, 40ד), by completion year (supplied table + Kol Zchut).
   // Points start the tax year after completion. Graduates of 2014-2022 may defer one year (deg.defer).
-  // A profession requiring an internship may defer to the year after the internship ends (deg.internEnd).
+  // A profession requiring an internship that began in the completion year or the next one may, by the
+  // taxpayer's choice (deg.internDefer), start the year after the internship ends (deg.internEnd).
   function degreePoints(deg, year) {
     const done = +deg.year; if (!done || done < 2014) return 0;
     let start = done + 1;
     if (deg.defer && done <= 2022) start += 1;
-    if (deg.internEnd && +deg.internEnd >= done && +deg.internEnd <= done + 1) start = Math.max(start, +deg.internEnd + 1);
+    if (deg.internDefer && deg.internEnd && +deg.internEnd >= done) start = Math.max(start, +deg.internEnd + 1);
     const n = year - start; if (n < 0) return 0;
-    const span = Math.min(3, Math.max(1, +deg.studyYears || 1));
+    const span = k => Math.min(k, Math.max(1, +deg.studyYears || 1));
+    const recent = done >= 2023;
     switch (deg.type) {
-      case 'BA': return done >= 2023 ? (n < span ? 1 : 0) : (n === 0 ? 1 : 0);
-      case 'MA': return done >= 2023 ? (n < 2 ? 0.5 : 0) : (n === 0 ? 0.5 : 0);
+      case 'BA': return recent ? (n < span(3) ? 1 : 0) : (n === 0 ? 1 : 0);
+      case 'MA': return recent ? (n < span(2) ? 0.5 : 0) : (n === 0 ? 0.5 : 0);   // two years, by years of study
+      case 'PHD': return recent ? (n < 2 ? 0.5 : 0) : (n === 0 ? 0.5 : 0);         // direct-track doctorate
+      case 'MED': return recent ? (n < 3 ? 1 : n < 5 ? 0.5 : 0) : (n === 0 ? 1 : n === 1 ? 0.5 : 0);
       case 'CERT':
-        if (done >= 2023) return n < span ? 1 : 0;
+        if (recent) return n < span(3) ? 1 : 0;
         if (n !== 0) return 0;
         return done >= 2018 ? 1 : done === 2017 ? 0.75 : 0.5;
       default: return 0;
     }
   }
 
-  const DEGREE_LABEL = { BA: 'תואר ראשון', MA: 'תואר שני', CERT: 'תעודת מקצוע' };
+  const DEGREE_LABEL = { BA: 'תואר ראשון', MA: 'תואר שני', PHD: 'תואר שלישי ישיר', MED: 'רפואה / רפואת שיניים', CERT: 'תעודת מקצוע' };
 
   // Reserve combat service (39ב, temporary order 2026-2027): points by days served in the previous year.
   function reservePoints(days, year) {
@@ -146,12 +150,22 @@
     if (p.singleParent || p.loneParent) add(p.singleParent ? 'הורה יחיד' : 'חד הורי', 1);
     add('עולה / תושב חוזר', immigrantPoints(p.immigrant, year));
     if (p.soldier) add('חייל משוחרר / שירות לאומי', soldierPoints(p.soldier.discharge, p.soldier.full, year));
-    // One bachelor's and one master's (they combine); a certificate does not combine with them: keep the larger.
+    // Education: the taxpayer chooses degrees OR a professional certificate (eduTrack); default by what was entered.
+    // One of each degree. A direct doctorate is not given on top of a master's. Medicine: on top of a used
+    // bachelor's point only the half point is given; with bachelor's and master's points, none.
     const first = t => (p.degrees || []).find(d => d.type === t);
-    const ba = first('BA') ? degreePoints(first('BA'), year) : 0, ma = first('MA') ? degreePoints(first('MA'), year) : 0;
-    const cert = first('CERT') ? degreePoints(first('CERT'), year) : 0;
-    if (cert > ba + ma) add(DEGREE_LABEL.CERT, cert);
-    else { add(DEGREE_LABEL.BA, ba); add(DEGREE_LABEL.MA, ma); }
+    const hasDegree = ['BA', 'MA', 'PHD', 'MED'].some(first);
+    const track = p.eduTrack || (hasDegree ? 'degrees' : 'cert');
+    if (track === 'cert') { if (first('CERT')) add(DEGREE_LABEL.CERT, degreePoints(first('CERT'), year)); }
+    else {
+      for (const t of ['BA', 'MA']) if (first(t)) add(DEGREE_LABEL[t], degreePoints(first(t), year));
+      if (first('PHD') && !first('MA')) add(DEGREE_LABEL.PHD, degreePoints(first('PHD'), year));
+      if (first('MED')) {
+        const m = degreePoints(first('MED'), year);
+        if (!first('BA') && !first('MA')) add(DEGREE_LABEL.MED, m);
+        else if (first('BA') && !first('MA')) add(DEGREE_LABEL.MED, m === 0.5 ? 0.5 : 0, true);
+      }
+    }
     add('לוחם מילואים', reservePoints((p.reserveDays || {})[year - 1], year));
     if (p.alimonyFrom && year >= +p.alimonyFrom) add('מזונות לבן זוג לשעבר', 1);
     const total = Math.round(items.reduce((s, i) => s + i.pts, 0) * 10000) / 10000;

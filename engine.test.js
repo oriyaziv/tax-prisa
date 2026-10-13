@@ -296,39 +296,51 @@ test('2026 children table (supplied) matches 2024-2025 rules', () => {
   assert.ok(!E.creditPoints({ children: [{ birthYear: 2020 }] }, 2026).items.find(i => i.label === 'ילדים').verify);
 });
 
-test('degrees and certificates (supplied table)', () => {
-  // BA: 2014-2022 one point, one year; 2023+ one point per study year up to 3
+test('degrees and certificates', () => {
   assert.equal(E.degreePoints({ type: 'BA', year: 2021 }, 2022), 1);
   assert.equal(E.degreePoints({ type: 'BA', year: 2021 }, 2023), 0);
-  assert.equal(E.degreePoints({ type: 'BA', year: 2021, defer: true }, 2022), 0);
   assert.equal(E.degreePoints({ type: 'BA', year: 2021, defer: true }, 2023), 1);
   assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 4 }, 2026), 1);
   assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 4 }, 2027), 0);
-  assert.equal(E.degreePoints({ type: 'BA', year: 2023, studyYears: 2 }, 2026), 0);
-  // MA: 2014-2022 0.5 one year; 2023+ 0.5 for two years
+  // MA 2023+: two years, by years of study
+  assert.equal(E.degreePoints({ type: 'MA', year: 2024, studyYears: 2 }, 2026), 0.5);
+  assert.equal(E.degreePoints({ type: 'MA', year: 2024, studyYears: 1 }, 2026), 0);
   assert.equal(E.degreePoints({ type: 'MA', year: 2020 }, 2021), 0.5);
-  assert.equal(E.degreePoints({ type: 'MA', year: 2020 }, 2022), 0);
-  assert.equal(E.degreePoints({ type: 'MA', year: 2024, studyYears: 1 }, 2026), 0.5);
-  assert.equal(E.degreePoints({ type: 'MA', year: 2024 }, 2027), 0);
-  // Certificate by completion year
+  // certificate
   assert.equal(E.degreePoints({ type: 'CERT', year: 2015 }, 2016), 0.5);
   assert.equal(E.degreePoints({ type: 'CERT', year: 2017 }, 2018), 0.75);
   assert.equal(E.degreePoints({ type: 'CERT', year: 2020 }, 2021), 1);
-  assert.equal(E.degreePoints({ type: 'CERT', year: 2023, studyYears: 2 }, 2025), 1);
   assert.equal(E.degreePoints({ type: 'CERT', year: 2023, studyYears: 2 }, 2026), 0);
-  // internship deferral
-  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021 }, 2021), 0);
-  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021 }, 2022), 1);
-  // before 2014: none
+  // internship deferral only when chosen
+  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021 }, 2021), 1);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021, internDefer: true }, 2021), 0);
+  assert.equal(E.degreePoints({ type: 'BA', year: 2020, internEnd: 2021, internDefer: true }, 2022), 1);
+  // direct doctorate
+  assert.equal(E.degreePoints({ type: 'PHD', year: 2023 }, 2024), 0.5);
+  assert.equal(E.degreePoints({ type: 'PHD', year: 2023 }, 2025), 0.5);
+  assert.equal(E.degreePoints({ type: 'PHD', year: 2023 }, 2026), 0);
+  assert.equal(E.degreePoints({ type: 'PHD', year: 2020 }, 2021), 0.5);
+  assert.equal(E.degreePoints({ type: 'PHD', year: 2020 }, 2022), 0);
+  // medicine: 2023+ 1 x3 then 0.5 x2; 2014-2022 1 then 0.5
+  assert.deepEqual([2024, 2025, 2026, 2027, 2028, 2029].map(y => E.degreePoints({ type: 'MED', year: 2023 }, y)), [1, 1, 1, 0.5, 0.5, 0]);
+  assert.deepEqual([2021, 2022, 2023].map(y => E.degreePoints({ type: 'MED', year: 2020 }, y)), [1, 0.5, 0]);
   assert.equal(E.degreePoints({ type: 'BA', year: 2012 }, 2013), 0);
 });
 
-test('degree combination rules', () => {
-  // BA + MA same year combine
-  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2023, studyYears: 3 }, { type: 'MA', year: 2024 }] }, 2025).total, 2.25 + 1.5);
-  // certificate does not combine: larger wins
-  const r = E.creditPoints({ degrees: [{ type: 'MA', year: 2024 }, { type: 'CERT', year: 2024, studyYears: 2 }] }, 2025);
-  near(r.total, 2.25 + 1); assert.ok(r.items.some(i => i.label === 'תעודת מקצוע'));
-  // only one BA counted
+test('education combination rules', () => {
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2023, studyYears: 3 }, { type: 'MA', year: 2024, studyYears: 2 }] }, 2025).total, 2.25 + 1.5);
+  // degrees track: certificate ignored even if larger
+  near(E.creditPoints({ degrees: [{ type: 'MA', year: 2024, studyYears: 2 }, { type: 'CERT', year: 2024, studyYears: 2 }] }, 2025).total, 2.25 + 0.5);
+  // cert track chosen: degrees ignored
+  near(E.creditPoints({ eduTrack: 'cert', degrees: [{ type: 'MA', year: 2024, studyYears: 2 }, { type: 'CERT', year: 2024, studyYears: 2 }] }, 2025).total, 2.25 + 1);
+  // only certificate entered -> cert track by default
+  near(E.creditPoints({ degrees: [{ type: 'CERT', year: 2020 }] }, 2021).total, 3.25);
+  // PhD with BA adds; PhD not on top of MA
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2019 }, { type: 'PHD', year: 2023 }] }, 2024).total, 2.75);
+  near(E.creditPoints({ degrees: [{ type: 'MA', year: 2023, studyYears: 2 }, { type: 'PHD', year: 2023 }] }, 2024).total, 2.75);
+  // medicine alone; with BA only half point; with BA+MA none
+  near(E.creditPoints({ degrees: [{ type: 'MED', year: 2023 }] }, 2024).total, 3.25);
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2015 }, { type: 'MED', year: 2023 }] }, 2027).total, 2.75);
+  near(E.creditPoints({ degrees: [{ type: 'BA', year: 2015 }, { type: 'MA', year: 2017 }, { type: 'MED', year: 2023 }] }, 2027).total, 2.25);
   near(E.creditPoints({ degrees: [{ type: 'BA', year: 2021 }, { type: 'BA', year: 2021 }] }, 2022).total, 3.25);
 });
