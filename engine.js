@@ -176,13 +176,13 @@
   // Sources: "ניתוב שלב א'" 2023-2025 and the credits training booklet in the team knowledge base.
   // null = not in the material (no limit applied). `assumed` = 2026 frozen at 2025 values.
   const CREDIT_PARAMS = {
-    2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: null },
-    2021: { eilatCeil: 241080, donationMin: 190, shiftMax: 11280, shiftCeil: 128400, soldierCeil: null },
+    2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: 160560 },
+    2021: { eilatCeil: 241080, donationMin: 190, shiftMax: 11280, shiftCeil: 128400, soldierCeil: 160080 },
     2022: { eilatCeil: 246840, donationMin: 190, shiftMax: 11520, shiftCeil: 131520, soldierCeil: 160080 },
     2023: { eilatCeil: 259800, donationMin: 200, shiftMax: 12120, shiftCeil: 138480, soldierCeil: 160080 },
     2024: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
     2025: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
-    2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: null, assumed: ['donationMin'] },
+    2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
   };
 
   // cr: { settleRate (%), settleCeil, settleMonths, eilatIncome, pension, life, donation, shiftWage,\n  //       soldierSalary, soldierCeil (only where the year has no ceiling in the material), other }

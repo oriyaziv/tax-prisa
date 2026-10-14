@@ -257,9 +257,9 @@ test('donation minimum 2020-2021 is 190', () => {
 
 test('special-salary soldier: 5% up to ceiling, better of soldier / qualifying town', () => {
   near(E.shekelCredits(2024, 200000, { soldierSalary: 200000 }).total, 0.05 * 178320);
-  const r20 = E.shekelCredits(2020, 200000, { soldierSalary: 200000 });       // no ceiling in material
-  near(r20.total, 10000); assert.ok(r20.items[0].verify);
-  near(E.shekelCredits(2020, 200000, { soldierSalary: 200000, soldierCeil: 150000 }).total, 7500);
+  near(E.shekelCredits(2020, 200000, { soldierSalary: 200000 }).total, 8028);   // 5% x 160,560
+  near(E.shekelCredits(2021, 200000, { soldierSalary: 200000 }).total, 8004);   // 5% x 160,080
+  near(E.shekelCredits(2026, 200000, { soldierSalary: 200000 }).total, 8916);   // 5% x 178,320
   // town 7% x 146,642 = 10,264.94 > soldier 8,916 -> town kept
   const a = E.shekelCredits(2024, 200000, { soldierSalary: 200000, settleRate: 7, settleCeil: 146642 });
   near(a.total, 10264.94); assert.equal(a.items.length, 1);
