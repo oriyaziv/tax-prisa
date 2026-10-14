@@ -74,6 +74,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .mode b{display:block;font-size:1.05rem}
 .mode small{display:block;color:var(--muted);font-size:.83rem}
 .mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.bonly .pts{text-decoration:line-through;opacity:.5}
 .credrow td{background:var(--bg);white-space:normal}
 .crform{display:grid;gap:10px;padding-block:6px;position:sticky;right:0;max-width:min(860px,calc(100vw - 80px))}
 .crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
@@ -213,6 +214,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
       <button id="splitBtn" type="button">חלק בשווה לשנים אלה</button>
       <button id="addYear" type="button" class="ghost">+ הוסף שנה</button>
     </div>
+    <label class="check"><input type="checkbox" id="bracketsOnly"> חישוב לשנים הקודמות לפי מדרגות המס בלבד, בלי נקודות זיכוי וזיכויים (שנת התשלום נשארת עם הזיכויים)</label>
     <p class="note">הכנסה חייבת: מטופס 106 של אותה שנה, בלי התשלום. זיכויים (₪): לחצו על הסכום כדי לפתוח את פירוט הזיכויים של אותה שנה (יישוב מזכה, אילת, פנסיה, ביטוח חיים, תרומות, משמרות). אם בשנה מסוימת לא הייתה הכנסה, הזינו 0. נקודות הזיכוי שלא נוצלו יקוזזו מהמס על הסכום המיוחס. שורת שנת התשלום משמשת גם להשוואה למצב ללא פריסה.</p>
     <div class="scroll">
       <table id="ledger">
@@ -320,9 +322,15 @@ function pointsFor(y) {
 
 function creditsFor(y) { return E.shekelCredits(y, yd(y).base || 0, yd(y).cr); }
 
+// "Brackets only": prior years are taxed by the brackets alone, without credit points or credits.
+// The payment year always keeps its points and credits (as payroll computes it).
+const bracketsOnly = y => state.bracketsOnly && y < state.payYear;
+const effPts = y => bracketsOnly(y) ? 0 : pointsFor(y).value;
+const effCr = y => bracketsOnly(y) ? { total: 0, items: [] } : creditsFor(y);
+
 function buildInput() {
   const lines = Object.keys(state.alloc).map(Number).sort((a, b) => a - b).map(y => ({
-    year: y, alloc: state.alloc[y], base: yd(y).base || 0, points: pointsFor(y).value, extraCredit: creditsFor(y).total,
+    year: y, alloc: state.alloc[y], base: yd(y).base || 0, points: effPts(y), extraCredit: effCr(y).total,
   }));
   const p = yd(state.payYear);
   return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base || 0, points: pointsFor(state.payYear).value, extraCredit: creditsFor(state.payYear).total } };
@@ -413,11 +421,12 @@ function calc() {
   const r = E.computeSpread(input);
   const byYear = Object.fromEntries(r.lines.map(l => [l.year, l]));
   for (const tr of $('ledger').tBodies[0].querySelectorAll('tr[data-y]')) {
-    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = pointsFor(y).value, cr = creditsFor(y);
+    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = effPts(y), cr = effCr(y), bo = bracketsOnly(y);
     const t0 = E.netTax(d.base || 0, y, pts, cr.total);
-    tr.querySelector('[data-o="cr"]').textContent = ils(cr.total);
-    tr.querySelector('[data-o="crbr"]').innerHTML = cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ');
-    tr.querySelector('[data-o="br"]').innerHTML = breakdownHtml(y);
+    tr.classList.toggle('bonly', bo);
+    tr.querySelector('[data-o="cr"]').textContent = bo ? 'לא נכלל' : ils(cr.total);
+    tr.querySelector('[data-o="crbr"]').innerHTML = bo ? '' : cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ');
+    tr.querySelector('[data-o="br"]').innerHTML = bo ? '<span class="v">לא נכלל – מדרגות בלבד</span>' : breakdownHtml(y);
     tr.querySelector('[data-o="t0"]').textContent = ils(t0);
     tr.querySelector('[data-o="t1"]').textContent = l ? ils(l.t1) : '';
     tr.querySelector('[data-o="add"]').textContent = l ? ils(l.add) : '';
@@ -500,6 +509,7 @@ function split() {
 // ---- events ----
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'bracketsOnly') { state.bracketsOnly = t.checked; calc(); return; }
   if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
@@ -595,7 +605,7 @@ const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
 const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.';
 
 function yearsTable(lines, totalLabel) {
-  const rows = lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${ptsFmt(l.points)}${pointsFor(l.year).overridden ? '*' : ''}</td><td>${fmt(l.extraCredit || 0)}</td>
+  const rows = lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${bracketsOnly(l.year) ? '—' : ptsFmt(l.points) + (pointsFor(l.year).overridden ? '*' : '')}</td><td>${bracketsOnly(l.year) ? '—' : fmt(l.extraCredit || 0)}</td>
     <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
   const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
   return `<table>
@@ -603,7 +613,7 @@ function yearsTable(lines, totalLabel) {
       <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>${totalLabel}</td><td>${fmt(inc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(tax)}</td><td>${pct(inc ? tax / inc : NaN)}</td></tr></tfoot>
-  </table>${lines.some(l => pointsFor(l.year).overridden) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}${creditsTable(lines.map(l => l.year))}`;
+  </table>${lines.some(l => pointsFor(l.year).overridden && !bracketsOnly(l.year)) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}${lines.some(l => bracketsOnly(l.year)) ? '<div class="foot">השנים הקודמות חושבו לפי מדרגות המס בלבד, בלי נקודות זיכוי וזיכויים.</div>' : ''}${creditsTable(lines.map(l => l.year).filter(y => !bracketsOnly(y)))}`;
 }
 
 function creditsTable(ys) {
