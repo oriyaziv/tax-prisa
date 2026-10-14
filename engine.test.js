@@ -344,3 +344,8 @@ test('education combination rules', () => {
   near(E.creditPoints({ degrees: [{ type: 'BA', year: 2015 }, { type: 'MA', year: 2017 }, { type: 'MED', year: 2023 }] }, 2027).total, 2.25);
   near(E.creditPoints({ degrees: [{ type: 'BA', year: 2021 }, { type: 'BA', year: 2021 }] }, 2022).total, 3.25);
 });
+
+test('special-salary soldier ceilings 2022-2023', () => {
+  near(E.shekelCredits(2022, 200000, { soldierSalary: 200000 }).total, 8196);
+  near(E.shekelCredits(2023, 200000, { soldierSalary: 200000 }).total, 8628);
+});

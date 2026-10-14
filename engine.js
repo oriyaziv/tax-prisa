@@ -178,8 +178,8 @@
   const CREDIT_PARAMS = {
     2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: 160560 },
     2021: { eilatCeil: 241080, donationMin: 190, shiftMax: 11280, shiftCeil: 128400, soldierCeil: 160080 },
-    2022: { eilatCeil: 246840, donationMin: 190, shiftMax: 11520, shiftCeil: 131520, soldierCeil: 160080 },
-    2023: { eilatCeil: 259800, donationMin: 200, shiftMax: 12120, shiftCeil: 138480, soldierCeil: 160080 },
+    2022: { eilatCeil: 246840, donationMin: 190, shiftMax: 11520, shiftCeil: 131520, soldierCeil: 163920 },
+    2023: { eilatCeil: 259800, donationMin: 200, shiftMax: 12120, shiftCeil: 138480, soldierCeil: 172560 },
     2024: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
     2025: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
     2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
