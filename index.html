@@ -74,6 +74,8 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .mode b{display:block;font-size:1.05rem}
 .mode small{display:block;color:var(--muted);font-size:.83rem}
 .mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+#ledger.compact tr > :nth-child(4), #ledger.compact tr > :nth-child(5), #ledger.compact tr > :nth-child(6),
+#ledger.compact tr > :nth-child(7), #ledger.compact tr > :nth-child(9) { display:none }
 .wh{display:grid;gap:2px;font-size:.72rem;margin-top:4px}
 .wh select{padding:3px 5px;font-size:.78rem}
 .bonly .pts{text-decoration:line-through;opacity:.5}
@@ -221,11 +223,11 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
     <div class="scroll">
       <table id="ledger">
         <thead><tr>
-          <th>שנת מס</th><th>סכום מיוחס (₪)</th><th>הכנסה חייבת במס שולי (₪)</th><th>נקודות זיכוי</th><th>זיכויים (₪)</th>
+          <th>שנת מס</th><th>הכנסה חייבת במס שולי (₪)</th><th>סכום מיוחס (₪)</th><th>נקודות זיכוי</th><th>זיכויים (₪)</th>
           <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על הסכום המיוחס</th><th>שיעור</th><th></th>
         </tr></thead>
         <tbody></tbody>
-        <tfoot><tr><td>סה"כ</td><td id="sumAlloc"></td><td colspan="5"></td><td id="sumTax"></td><td id="sumRate"></td><td></td></tr></tfoot>
+        <tfoot><tr><td>סה"כ</td><td></td><td id="sumAlloc"></td><td></td><td></td><td></td><td></td><td id="sumTax"></td><td id="sumRate"></td><td></td></tr></tfoot>
       </table>
     </div>
     <div id="alert" class="alert" hidden></div>
@@ -234,8 +236,8 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
   <section class="panel">
     <h2>תוצאה</h2>
     <div class="summary">
-      <div class="stat key"><div class="k" id="kRate">מקדמת מס (שיעור)</div><div class="v" id="rRate"></div></div>
-      <div class="stat"><div class="k" id="kTax">מקדמת מס (₪)</div><div class="v" id="rTax"></div></div>
+      <div class="stat key" id="statRate"><div class="k" id="kRate">מקדמת מס (שיעור)</div><div class="v" id="rRate"></div></div>
+      <div class="stat" id="statTax"><div class="k" id="kTax">מקדמת מס (₪)</div><div class="v" id="rTax"></div></div>
       <div class="stat"><div class="k" id="kPrevInc">סה"כ הכנסה שמיוחסת לשנים קודמות</div><div class="v" id="rPrevInc"></div></div>
       <div class="stat"><div class="k" id="kPrevTax">סה"כ מס שמיוחס לשנים קודמות</div><div class="v" id="rPrevTax"></div></div>
       <div class="stat" id="statNoSpread"><div class="k">מס ללא פריסה (הכל בשנת הדוח)</div><div class="v" id="rNoSpread"></div></div>
@@ -273,6 +275,7 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
       </tbody>
       <tfoot><tr><td>לדיווח בשנת הדוח</td><td id="aInc"></td><td id="aTax"></td></tr></tfoot>
     </table></div>
+    <label class="check"><input type="checkbox" id="annualFull"> חישוב המס הכולל לשנת הדוח (מקדמה, שיעור והשוואה למס ללא פריסה). דורש הזנת ההכנסות בשנת קבלת הכספים.</label>
     <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
   </section>
   </div>
@@ -311,9 +314,11 @@ const state = {
 };
 const yd = y => (state.data[y] ||= { base: null, cr: {}, ptsOverride: null }); // base null = not entered (counts as 0)
 
+// Annual report without "total tax": no income or tax for the year the money was received.
+const annualShort = () => state.mode === 'annual' && !state.annualFull;
 function years() {
   const s = new Set(Object.keys(state.alloc).map(Number));
-  s.add(state.payYear);
+  if (!annualShort()) s.add(state.payYear);
   return [...s].sort((a, b) => a - b);
 }
 function pointsFor(y) {
@@ -374,10 +379,10 @@ function renderLedger() {
     const d = yd(y), pf = pointsFor(y);
     return `<tr data-y="${y}" class="${y === state.payYear ? 'payrow' : ''}">
       <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
-      <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
-      <td><input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן" title="סך ההכנסות החייבות במס שולי של הנישום, ללא הסכום מהפריסה">
+      <td>${annualShort() && y === state.payYear ? '<span class="note">לא נדרש</span>' : `<input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן" title="סך ההכנסות החייבות במס שולי של הנישום, ללא הסכום מהפריסה">`}
         ${state.mode === 'annual' && y < state.payYear ? `<label class="wh">נוכה מס לפי 106?<select id="wh${y}" data-f="withheld">
           <option value="1"${withheld(y) ? ' selected' : ''}>כן – מדרגות בלבד</option><option value="0"${withheld(y) ? '' : ' selected'}>לא – כולל זיכויים</option></select></label>` : ''}</td>
+      <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
       <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
         <div class="ptsbreak" data-o="br"></div></td>
       <td><button type="button" class="ghost crbtn" data-cr="${y}" aria-expanded="false" aria-controls="crrow${y}"><span data-o="cr"></span> ▾</button>
@@ -443,6 +448,12 @@ function calc() {
     const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = effPts(y), cr = effCr(y), bo = bracketsOnly(y);
     const t0 = E.netTax(d.base || 0, y, pts, cr.total);
     tr.classList.toggle('bonly', bo);
+    if (annualShort() && y === state.payYear) {
+      for (const k of ['t0', 't1', 'rate']) tr.querySelector(`[data-o="${k}"]`).textContent = '';
+      tr.querySelector('[data-o="add"]').textContent = 'נשאר בשנת הדוח';
+      tr.querySelector('[data-o="cr"]').textContent = '—'; tr.querySelector('[data-o="crbr"]').innerHTML = ''; tr.querySelector('[data-o="br"]').innerHTML = '';
+      continue;
+    }
     tr.querySelector('[data-o="cr"]').textContent = bo ? 'לא נכלל' : ils(cr.total);
     tr.querySelector('[data-o="crbr"]').innerHTML = bo ? '' : cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ');
     tr.querySelector('[data-o="br"]').innerHTML = bo ? '<span class="v">לא נכלל – מדרגות בלבד</span>' : breakdownHtml(y);
@@ -451,6 +462,12 @@ function calc() {
     tr.querySelector('[data-o="add"]').textContent = l ? ils(l.add) : '';
     tr.querySelector('[data-o="rate"]').textContent = l ? pct(l.rate) : '';
   }
+  // Short table when every prior year is brackets only (annual report).
+  const priorYears = Object.keys(state.alloc).map(Number).filter(y => y < state.payYear);
+  const compact = state.mode === 'annual' && priorYears.length > 0 && priorYears.every(bracketsOnly);
+  $('ledger').classList.toggle('compact', compact);
+  $('statRate').hidden = $('statTax').hidden = annualShort();
+  $('statNoSpread').hidden = !(state.mode === 'annual' && state.annualFull);
   $('sumAlloc').textContent = ils(r.sumAlloc);
   $('sumTax').textContent = ils(r.sumTax);
   $('sumRate').textContent = pct(r.rate);
@@ -459,6 +476,8 @@ function calc() {
   $('rPrevInc').textContent = ils(prev.reduce((s, l) => s + l.alloc, 0));
   $('rPrevTax').textContent = ils(prev.reduce((s, l) => s + l.add, 0));
   $('payPart').hidden = !cur;
+  if (cur && annualShort()) { $('payPart').textContent = `חלק שנשאר בשנת הדוח ${state.payYear}: ${ils(cur.alloc)}. הוא אינו מופחת, והמס עליו לא מחושב כאן.`; }
+  else
   if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
   $('rTax').textContent = ils(r.sumTax);
   $('rNoSpread').textContent = ils(r.noSpread);
@@ -478,7 +497,7 @@ function calc() {
   const warns = [];
   const missing = input.lines.filter(l => l.year !== state.payYear && yd(l.year).base == null).map(l => l.year);
   if (missing.length) warns.push(`בשנים ${missing.join(', ')} לא הוזנה הכנסה חייבת. החישוב מניח 0. אם באמת לא הייתה הכנסה, הזינו 0.`);
-  if (yd(state.payYear).base == null) warns.push(state.mode === 'coord'
+  if (!annualShort() && yd(state.payYear).base == null) warns.push(state.mode === 'coord'
     ? `לא הוזנה הכנסה חייבת לשנת ${state.payYear}. היא נדרשת לחישוב הזיכוי המאולץ.`
     : `לא הוזנה הכנסה חייבת לשנת הדוח ${state.payYear}. היא נדרשת להשוואה למס ללא פריסה.`);
   if (state.mode === 'coord' && r.forcedCredit < 0) warns.push(`המס לפי הפריסה (${ils(r.sumTax)}) גבוה מהמס בלי פריסה (${ils(r.noSpread)}). הפריסה אינה מקטינה את המס, ולכן אין זיכוי מאולץ.`);
@@ -528,6 +547,7 @@ function split() {
 // ---- events ----
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'annualFull') { state.annualFull = t.checked; renderLedger(); return; }
   if (t.id === 'bracketsOnly') { state.bracketsOnly = t.checked; calc(); return; }
   if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
@@ -625,14 +645,22 @@ const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
 const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.';
 
 function yearsTable(lines, totalLabel) {
-  const rows = lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.base)}</td><td>${bracketsOnly(l.year) ? '—' : ptsFmt(l.points) + (pointsFor(l.year).overridden ? '*' : '')}</td><td>${bracketsOnly(l.year) ? '—' : fmt(l.extraCredit || 0)}</td>
-    <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
   const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
+  if (state.mode === 'annual' && lines.length && lines.every(l => bracketsOnly(l.year))) {
+    // Short table: brackets only in every year
+    return `<table>
+      <thead><tr><th>שנת מס</th><th>הכנסה חייבת במס שולי</th><th>סכום מיוחס</th><th>מס על הסכום המיוחס</th></tr></thead>
+      <tbody>${lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.base)}</td><td>${fmt(l.alloc)}</td><td>${fmt(l.add)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>${totalLabel}</td><td></td><td>${fmt(inc)}</td><td>${fmt(tax)}</td></tr></tfoot>
+    </table><div class="foot">החישוב לפי מדרגות המס בלבד, כי בכל השנים נוכה מס לפי 106 (הזיכויים נוצלו).</div>`;
+  }
+  const rows = lines.map(l => `<tr><td>${l.year}</td><td>${fmt(l.base)}</td><td>${fmt(l.alloc)}</td><td>${bracketsOnly(l.year) ? '—' : ptsFmt(l.points) + (pointsFor(l.year).overridden ? '*' : '')}</td><td>${bracketsOnly(l.year) ? '—' : fmt(l.extraCredit || 0)}</td>
+    <td>${fmt(l.t0)}</td><td>${fmt(l.t1)}</td><td>${fmt(l.add)}</td><td>${pct(l.rate)}</td></tr>`).join('');
   return `<table>
-    <thead><tr><th>שנת מס</th><th>סכום מיוחס</th><th>הכנסה חייבת</th><th>נק' זיכוי</th><th>זיכויים</th>
+    <thead><tr><th>שנת מס</th><th>הכנסה חייבת במס שולי</th><th>סכום מיוחס</th><th>נק' זיכוי</th><th>זיכויים</th>
       <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על המיוחס</th><th>שיעור</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td>${totalLabel}</td><td>${fmt(inc)}</td><td></td><td></td><td></td><td></td><td></td><td>${fmt(tax)}</td><td>${pct(inc ? tax / inc : NaN)}</td></tr></tfoot>
+    <tfoot><tr><td>${totalLabel}</td><td></td><td>${fmt(inc)}</td><td></td><td></td><td></td><td></td><td>${fmt(tax)}</td><td>${pct(inc ? tax / inc : NaN)}</td></tr></tfoot>
   </table>${lines.some(l => pointsFor(l.year).overridden && !bracketsOnly(l.year)) ? '<div class="foot">* נקודות זיכוי שתוקנו ידנית.</div>' : ''}${lines.some(l => bracketsOnly(l.year)) ? `<div class="foot">${state.mode === 'annual' ? 'שנים שמסומן בהן "—" חושבו לפי מדרגות המס בלבד, כי נוכה בהן מס לפי 106 (הזיכויים נוצלו).' : 'השנים הקודמות חושבו לפי מדרגות המס בלבד, בלי נקודות זיכוי וזיכויים.'}</div>` : ''}${creditsTable(lines.map(l => l.year).filter(y => !bracketsOnly(y)))}`;
 }
 
@@ -671,8 +699,9 @@ function buildRefundSheet() {
     <div class="kv">
       <span>הכנסה שמיוחסת לשנים קודמות (להפחתה מ${incWord() === 'פיצויים חייבים' ? 'הפיצויים החייבים' : 'הסכום החייב'} שהתקבלו)</span><b>${ils(adj.prevIncome)}</b>
       <span>מס שמיוחס לשנים קודמות (להפחתה מהמס שנוכה בשנת קבלת הכספים)</span><b>${ils(adj.prevTax)}</b>
-      <span>מקדמת המס עבור כלל הסכום שהתקבל (סכום)</span><b>${ils(r.sumTax)}</b>
+      ${state.annualFull ? `<span>מקדמת המס עבור כלל הסכום שהתקבל (סכום)</span><b>${ils(r.sumTax)}</b>
       <span>מקדמת המס עבור כלל הסכום שהתקבל (שיעור)</span><b>${pct(r.rate)}</b>
+      <span>מס ללא פריסה (בשנת ${state.payYear})</span><b>${ils(r.noSpread)}</b>` : ''}
     </div>
     <h3>התאמות לשנת הדוח ${state.payYear} (₪)</h3>
     <table class="adjt">
@@ -767,7 +796,6 @@ function setMode(mode) {
   $('modeHint').hidden = true;
   $('certPanel').hidden = mode !== 'coord';
   $('refundPanel').hidden = mode !== 'annual';
-  $('statNoSpread').hidden = mode !== 'annual';
   applyType();
   if (state.type !== 'severance') split();
 }
