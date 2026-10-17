@@ -75,8 +75,10 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .mode b{display:block;font-size:1.05rem}
 .mode small{display:block;color:var(--muted);font-size:.83rem}
 .mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
-#ledger.compact tr > :nth-child(4), #ledger.compact tr > :nth-child(5), #ledger.compact tr > :nth-child(6),
-#ledger.compact tr > :nth-child(7), #ledger.compact tr > :nth-child(9) { display:none }
+#ledger tr > :nth-child(6), #ledger tr > :nth-child(7) { display:none }   /* tax on income / incl. allocation: computed, shown in PDF only */
+#ledger.compact tr > :nth-child(4), #ledger.compact tr > :nth-child(5), #ledger.compact tr > :nth-child(9) { display:none }
+.paybox{border:1px solid var(--accent);background:var(--accent-soft);border-radius:8px;padding:12px;display:grid;gap:8px}
+.paybox .row{align-items:center}
 #ledger th:first-child, #ledger tbody td:first-child, #ledger tfoot td:first-child{width:1%;white-space:nowrap}
 #ledger .tag{display:block;margin:2px 0 0}
 #ledger.compact{width:auto}
@@ -200,6 +202,15 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 
   <section class="panel" id="profilePanel">
     <h2>פרטי הנישום לחישוב נקודות זיכוי</h2>
+    <div class="paybox" id="payBox" hidden>
+      <h3>שנת קבלת הכספים <span id="pbYear"></span> – נקודות זיכוי (שדה 038) וזיכויים</h3>
+      <div class="row">
+        <label>נקודות זיכוי<input class="num pts" id="ptPay" inputmode="decimal"></label>
+        <label>זיכויים (₪)<button type="button" class="ghost crbtn" id="crPayBtn"><span id="pbCr"></span> ▾</button></label>
+      </div>
+      <div class="ptsbreak" id="pbBreak" style="max-width:none"></div>
+      <p class="note">הנקודות מחושבות מהפרטים שלמטה. אפשר לתקן ידנית, ומחיקת הערך מחזירה לחישוב האוטומטי. הזיכויים נפתחים מתחת לטבלה.</p>
+    </div>
     <p class="note">הפרטים כאן משמשים רק לחישוב, ואינם מודפסים ב-PDF. נקודות הזיכוי מחושבות לכל שנה בנפרד, ואפשר לתקן כל שנה ידנית בטבלה.</p>
     <div class="grid">
       <label>מין<select id="gender"><option value="M">גבר</option><option value="F">אישה</option></select></label>
@@ -485,8 +496,20 @@ function calc() {
   }
   // Short table when every prior year is brackets only (annual report).
   const priorYears = Object.keys(state.alloc).map(Number).filter(y => y < state.payYear);
-  const compact = state.mode === 'annual' && priorYears.length > 0 && priorYears.every(bracketsOnly);
+  const compact = priorYears.length > 0 && priorYears.every(bracketsOnly);
   $('ledger').classList.toggle('compact', compact);
+  // Payment-year box (tax coordination): points for field 038 and credits.
+  const showBox = state.mode === 'coord';
+  $('payBox').hidden = !showBox;
+  if (showBox) {
+    const py = state.payYear, pf = pointsFor(py), pc = creditsFor(py);
+    $('pbYear').textContent = py;
+    if (document.activeElement !== $('ptPay')) $('ptPay').value = ptsFmt(pf.value);
+    $('ptPay').classList.toggle('override', pf.overridden);
+    $('pbCr').textContent = ils(pc.total);
+    $('crPayBtn').dataset.cr = py;
+    $('pbBreak').innerHTML = breakdownHtml(py) + (pc.items.length ? ' · ' + pc.items.map(i => `${esc(i.label)} ${fmt(i.amount)} ₪`).join(' · ') : '');
+  }
   $('statRate').hidden = $('statTax').hidden = annualShort();
   $('statNoSpread').hidden = !(state.mode === 'annual' && state.annualFull);
   $('sumAlloc').textContent = ils(r.sumAlloc);
@@ -570,6 +593,12 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'annualFull') { state.annualFull = t.checked; renderLedger(); return; }
   if (t.name === 'whMode') { state.whMode = t.value; renderLedger(); return; }
+  if (t.id === 'ptPay') {
+    const v = t.value.trim();
+    yd(state.payYear).ptsOverride = v === '' ? null : num(v);
+    const el = $('pt' + state.payYear); if (el) el.value = ptsFmt(pointsFor(state.payYear).value);
+    calc(); return;
+  }
   if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
   if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
@@ -622,6 +651,7 @@ function renderPointsOnly() {
 }
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'ptPay') { calc(); return; }
   if (t.id === 'payType') { state.type = t.value; applyType(); }
   else if (t.id === 'payYear') { state.payYear = +t.value; applyType(); }
   else if (t.id === 'sevYears') { state.sevYears = +t.value; applyType(); }
@@ -636,6 +666,7 @@ document.addEventListener('click', e => {
   if (t.dataset.cr) {
     const y = +t.dataset.cr, row = $('crrow' + y);
     row.hidden = !row.hidden; t.setAttribute('aria-expanded', String(!row.hidden));
+    if (t.id === 'crPayBtn' && !row.hidden) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
     if (row.hidden) openCredits.delete(y); else openCredits.add(y);
     return;
   }
@@ -667,7 +698,7 @@ const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי 
 
 function yearsTable(lines, totalLabel) {
   const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
-  if (state.mode === 'annual' && lines.length && lines.every(l => bracketsOnly(l.year))) {
+  if (lines.length && lines.every(l => bracketsOnly(l.year))) {
     // Short table: brackets only in every year
     return `<table>
       <thead><tr><th>שנת מס</th><th>הכנסה חייבת במס שולי</th><th>סכום מיוחס</th><th>מס על הסכום המיוחס</th></tr></thead>
