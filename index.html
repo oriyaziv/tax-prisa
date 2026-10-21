@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&display=swap">
 <style>
-/* Layout: one working column: payment → taxpayer details → years ledger → result; bracket/rules reference at the bottom. Off-screen A4 sheet feeds the PDF. */
+/* Layout: a four-step wizard (purpose → income → credits → result), one step visible at a time. Off-screen A4 sheet feeds the PDF. */
 :root{
   --bg:#f3f5f4; --surface:#ffffff; --ink:#18221e; --muted:#5b6862; --line:#d5ddd9;
   --accent:#1d5c48; --accent-ink:#ffffff; --accent-soft:#e2eee9;
@@ -23,84 +23,103 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
-.wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:28px 60px;display:grid;gap:20px}
-header{text-align:center}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:28px 60px;display:grid;gap:20px}
+header{text-align:center;display:grid;gap:6px}
 header h1{font-family:var(--f-display);font-weight:700;font-size:2rem;margin:0;text-wrap:balance}
-header p{margin:.3rem auto 0;color:var(--muted);max-width:70ch}
-section.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
-h2{font-family:var(--f-display);font-weight:500;font-size:1.3rem;margin:0}
-h3{font-size:.95rem;margin:0;font-weight:600}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+header p{margin:0 auto;color:var(--muted);max-width:70ch}
+section.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:16px;min-width:0}
+section.panel>*,#profileArea>*{min-width:0}   /* let wide tables scroll inside their box instead of widening the page */
+h2{font-family:var(--f-display);font-weight:500;font-size:1.35rem;margin:0}
+h3{font-size:1rem;margin:0;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end}
 label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
-label.check{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:.9rem}
+label.check{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:.92rem}
 input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;font-variant-numeric:tabular-nums}
 input[type=checkbox]{width:auto;accent-color:var(--accent)}
-input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 input.num{direction:ltr;text-align:right}
 input[readonly]{opacity:.75}
 input.override{border-color:var(--warn);background:var(--warn-soft)}
-button{font:inherit;cursor:pointer;border-radius:6px;padding:8px 14px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:500}
+button{font:inherit;cursor:pointer;border-radius:6px;padding:8px 16px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:500}
 button.primary{background:var(--accent);color:var(--accent-ink)}
-button.ghost{border-color:var(--line);color:var(--muted);padding:4px 9px}
+button.ghost{border-color:var(--line);color:var(--muted);padding:4px 10px}
 button:disabled{opacity:.5;cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
-.row>label{flex:0 1 160px}
-.sub{border-top:1px dashed var(--line);padding-top:10px}
-details.sub>summary{cursor:pointer;font-weight:600;font-size:.95rem;padding-block:2px}
-details.sub[open]>summary{margin-bottom:10px}
-details.sub[open]{display:grid;gap:8px}
-.cnt{font-weight:400;font-size:.8rem;color:var(--accent);margin-inline-start:6px}
-.list{display:grid;gap:8px}
-.list .item{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
-.list .item>label{flex:0 1 150px}
+.row>label{flex:0 1 170px}
+.note{font-size:.88rem;color:var(--muted);margin:0}
+.lead{font-size:.95rem;color:var(--muted);margin:-6px 0 0}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:.9rem}
+.alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;vertical-align:middle}
-th{font-size:.78rem;color:var(--muted);font-weight:500;letter-spacing:.02em}
-td input{min-width:105px}
-td input.pts{min-width:76px}
-tr.payrow td{background:var(--accent-soft)}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;vertical-align:middle}
+th{font-size:.78rem;color:var(--muted);font-weight:500}
+td input{min-width:110px}
 tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 .tag{display:inline-block;font-size:.72rem;padding:1px 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-inline-start:6px}
-.tag.warn{background:var(--warn-soft);color:var(--warn)}
-.ptsbreak{font-size:.75rem;color:var(--muted);white-space:normal;min-width:190px;max-width:240px;line-height:1.4;margin-top:4px}
+.ptsbreak{font-size:.76rem;color:var(--muted);white-space:normal;min-width:200px;line-height:1.4}
 .ptsbreak .v{color:var(--warn)}
-.note{font-size:.85rem;color:var(--muted);margin:0}
-.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:.9rem}
-.adj{max-width:560px}
-.stack{display:grid;gap:20px}
+
+/* stepper */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;list-style:none;margin:0;padding:0}
+.steps button{width:100%;display:flex;gap:10px;align-items:center;justify-content:flex-start;text-align:right;border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:10px 12px;border-radius:8px}
+.steps .n{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--line);font-weight:600;color:var(--muted)}
+.steps .t{display:grid;line-height:1.25}
+.steps .t small{font-size:.75rem;font-weight:400}
+.steps button[aria-current="step"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.steps button[aria-current="step"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.steps button.done .n{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.steps button:disabled{opacity:.55}
+@media (max-width:640px){.steps .t small{display:none}.steps button{flex-direction:column;align-items:center;text-align:center;padding:8px 4px;gap:4px}}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.nav .grow{flex:1}
+.topbar{display:flex;justify-content:flex-end}
+
+/* step A: choice cards */
 .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.whq{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
 .mode{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;color:var(--ink)}
 .mode input{width:auto;margin-top:5px;accent-color:var(--accent)}
 .mode b{display:block;font-size:1.05rem}
 .mode small{display:block;color:var(--muted);font-size:.83rem}
 .mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
-#ledger tr > :nth-child(6), #ledger tr > :nth-child(7) { display:none }   /* tax on income / incl. allocation: computed, shown in PDF only */
-#ledger.compact tr > :nth-child(4), #ledger.compact tr > :nth-child(5), #ledger.compact tr > :nth-child(9) { display:none }
-.paybox{border:1px solid var(--accent);background:var(--accent-soft);border-radius:8px;padding:12px;display:grid;gap:8px}
-.paybox .row{align-items:center}
-#ledger th:first-child, #ledger tbody td:first-child, #ledger tfoot td:first-child{width:1%;white-space:nowrap}
-#ledger .tag{display:block;margin:2px 0 0}
-#ledger.compact{width:auto}
-#ledger.compact th:first-child, #ledger.compact tbody td:first-child, #ledger.compact tfoot td:first-child{width:auto}
-#ledger.compact td input{width:150px;min-width:0}
-#ledger.compact th, #ledger.compact td{padding-inline:14px}
-.whq{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.wh{display:grid;gap:2px;font-size:.72rem;margin-top:4px}
-.wh select{padding:3px 5px;font-size:.78rem}
-.bonly .pts{text-decoration:line-through;opacity:.5}
-.credrow td{background:var(--bg);white-space:normal}
-.crform{display:grid;gap:10px;padding-block:6px;position:sticky;right:0;max-width:min(860px,calc(100vw - 80px))}
-.crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.crbtn{font-variant-numeric:tabular-nums;color:var(--ink)}
-.alert{background:var(--bad-soft);color:var(--bad);border-radius:6px;padding:8px 12px;font-size:.9rem}
+
+/* step B: allocation list */
+#allocTable{width:auto;min-width:min(100%,420px)}
+#allocTable td input{width:160px}
+
+/* step C: collapsible rows */
+.group{border:1px solid var(--line);border-radius:8px;padding:0 14px}
+.group+.group{margin-top:-8px}
+details.sub{border-top:1px dashed var(--line)}
+details.sub:first-child{border-top:none}
+details.sub>summary{cursor:pointer;font-weight:600;font-size:.95rem;padding-block:11px;list-style-position:inside}
+details.sub[open]{padding-bottom:12px}
+details.sub[open]>summary{margin-bottom:6px}
+details.sub>div,details.sub>p{margin-block:6px}
+.cnt{font-weight:400;font-size:.8rem;color:var(--accent);margin-inline-start:6px}
+.list{display:grid;gap:8px}
+.list .item{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.list .item>label{flex:0 1 150px}
+.ytable{width:auto}
+.ytable td input{width:150px;min-width:0}
+.ytable td.lim{font-size:.8rem;color:var(--muted)}
+.whlist{display:flex;flex-wrap:wrap;gap:8px 18px}
+.ptsum td input{width:90px;min-width:0}
+tr.payrow td{background:var(--accent-soft)}
+
+/* step D */
+#ledger{width:auto;min-width:min(100%,560px)}
+#ledger td input{width:160px;min-width:0}
+#ledger.compact .rate{display:none}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .stat{border:1px solid var(--line);border-radius:8px;padding:12px}
 .stat .k{font-size:.8rem;color:var(--muted)}
 .stat .v{font-size:1.45rem;font-weight:600;font-variant-numeric:tabular-nums}
 .stat.key{background:var(--accent-soft);border-color:var(--accent)}
 .stat.key .v{color:var(--accent)}
-.good{color:var(--good)}
+.adj{max-width:560px}
+.sub2{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:14px}
 .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 #pdfMsg{font-size:.9rem;color:var(--muted)}
 
@@ -131,24 +150,35 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
 <div class="wrap">
   <header>
     <h1>מחשבון פריסת מס לשנים קודמות</h1>
-    <p>ייחוס הפרשי שכר, פיצויים או הכנסה חד-פעמית לשנים קודמות. לכל שנה מחושב המס על הסכום המיוחס לפי מדרגות המס, נקודות הזיכוי והזיכויים של אותה שנה. התוצאה היא שיעור מס לניכוי במקור. הנתונים שמופיעים בפתיחה הם דוגמה.</p>
+    <p>ייחוס הפרשי שכר, פיצויים או הכנסה חד-פעמית לשנים קודמות, לפי מדרגות המס, נקודות הזיכוי והזיכויים של כל שנה.</p>
   </header>
 
-  <section class="panel" id="modePanel">
-    <h2>מטרת החישוב</h2>
-    <div class="modes" role="radiogroup">
+  <div class="topbar"><button type="button" class="ghost" id="resetBtn">נקה נתונים</button></div>
+
+  <nav aria-label="שלבי החישוב">
+    <ol class="steps">
+      <li><button type="button" data-go="1"><span class="n">א</span><span class="t">מטרת החישוב<small>תיאום מס או דוח שנתי</small></span></button></li>
+      <li><button type="button" data-go="2"><span class="n">ב</span><span class="t">ההכנסה שפורסים<small>סכום ושנות הפריסה</small></span></button></li>
+      <li><button type="button" data-go="3"><span class="n">ג</span><span class="t">זיכויים<small>נקודות זיכוי וזיכויים</small></span></button></li>
+      <li><button type="button" data-go="4"><span class="n">ד</span><span class="t">טבלה ותוצאה<small>הכנסות, מס ו-PDF</small></span></button></li>
+    </ol>
+  </nav>
+
+  <!-- ===== step A ===== -->
+  <section class="panel" id="step1" data-step="1">
+    <h2>א. מה רוצים לחשב?</h2>
+    <div class="modes" role="radiogroup" aria-label="מטרת החישוב">
       <label class="mode"><input type="radio" name="mode" id="modeCoord" value="coord">
         <span><b>אישור תיאום מס</b><small>שנה שוטפת 2026 · מקדמת מס וזיכוי מאולץ למערכת השכר</small></span></label>
       <label class="mode"><input type="radio" name="mode" id="modeAnnual" value="annual">
         <span><b>דוח שנתי (החזר מס)</b><small>שנות מס 2020–2025 · ייחוס לשנים קודמות והתאמות לשנת הדוח</small></span></label>
     </div>
-    <p class="note" id="modeHint">בחרו את מטרת החישוב כדי להמשיך.</p>
+    <div class="nav"><span class="grow"></span><button type="button" class="primary" data-next>הבא: ההכנסה שפורסים ←</button></div>
   </section>
 
-  <div id="work" class="stack" hidden>
-
-  <section class="panel">
-    <h2>פרטי התשלום</h2>
+  <!-- ===== step B ===== -->
+  <section class="panel" id="step2" data-step="2" hidden>
+    <h2>ב. ההכנסה שפורסים</h2>
     <div class="grid">
       <label>סוג התשלום
         <select id="payType">
@@ -158,113 +188,128 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
         </select>
       </label>
       <label>שנת התשלום<select id="payYear"></select></label>
-      <label>סכום חייב במס (₪)<input id="total" class="num" inputmode="numeric"></label>
+      <label>סכום חייב במס (₪)<input id="total" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
       <label id="sevWrap" hidden>מספר שנים לפריסה (כולל שנת התשלום)
         <select id="sevYears"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
       </label>
     </div>
     <p class="note" id="typeNote"></p>
-  </section>
-
-  <section class="panel" id="whPanel">
-    <h2>נקודות זיכוי בשנים הקודמות</h2>
-    <p class="note">האם נוכה מס לפי טופס 106 / דוח שנתי בשנים הקודמות? אם נוכה מס, הזיכויים כבר נוצלו, והמס על הסכום המיוחס מחושב לפי מדרגות המס בלבד.</p>
-    <div class="modes whq" role="radiogroup">
-      <label class="mode"><input type="radio" name="whMode" value="all" checked><span><b>כן</b><small>אין צורך בנקודות זיכוי – מדרגות המס בלבד</small></span></label>
-      <label class="mode"><input type="radio" name="whMode" value="some"><span><b>כן, בחלק מהשנים</b><small>מסמנים לכל שנה בטבלה</small></span></label>
-      <label class="mode"><input type="radio" name="whMode" value="none"><span><b>לא</b><small>משתמשים בנקודות הזיכוי והזיכויים</small></span></label>
-      <label class="mode"><input type="radio" name="whMode" value="full"><span><b>נוכה מס, אבל לחשב במלואו</b><small>החישוב כולל נקודות זיכוי וזיכויים בכל השנים</small></span></label>
-    </div>
-  </section>
-
-
-  <section class="panel">
-    <h2>ייחוס לשנים</h2>
     <div class="row" id="splitRow">
       <label>משנה<select id="fromYear"></select></label>
       <label>עד שנה<select id="toYear"></select></label>
       <button id="splitBtn" type="button">חלק בשווה לשנים אלה</button>
-      <button id="addYear" type="button" class="ghost">+ הוסף שנה</button>
     </div>
-    <p class="note"><b>הכנסה חייבת: יש להזין את סך ההכנסות החייבות במס שולי של הנישום, ללא הסכום מהפריסה.</b> <span id="whNote">לכל שנה קודמת מסמנים אם נוכה בה מס לפי 106. </span>זיכויים (₪): לחצו על הסכום כדי לפתוח את פירוט הזיכויים של אותה שנה (יישוב מזכה, אילת, פנסיה, ביטוח חיים, תרומות, משמרות). אם בשנה מסוימת לא הייתה הכנסה, הזינו 0. נקודות הזיכוי שלא נוצלו יקוזזו מהמס על הסכום המיוחס. שורת שנת התשלום משמשת גם להשוואה למצב ללא פריסה.</p>
+    <h3>הסכום לכל שנה</h3>
+    <div class="scroll">
+      <table id="allocTable">
+        <thead><tr><th>שנת מס</th><th>סכום מיוחס (₪)</th><th></th></tr></thead>
+        <tbody></tbody>
+        <tfoot><tr><td>סה"כ</td><td id="allocSum"></td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <div><button id="addYear" type="button" class="ghost">+ הוסף שנה</button></div>
+    <div id="alert2" class="alert" hidden></div>
+    <div class="nav"><button type="button" data-prev>→ הקודם</button><span class="grow"></span><button type="button" class="primary" data-next>הבא: זיכויים ←</button></div>
+  </section>
+
+  <!-- ===== step C ===== -->
+  <section class="panel" id="step3" data-step="3" hidden>
+    <h2>ג. נקודות זיכוי וזיכויים</h2>
+    <h3>האם נוכה מס לפי טופס 106 / דוח שנתי בשנים הקודמות?</h3>
+    <p class="lead">אם נוכה מס, הזיכויים כבר נוצלו, והמס על הסכום המיוחס מחושב לפי מדרגות המס בלבד.</p>
+    <div class="modes whq" role="radiogroup" aria-label="ניכוי מס בשנים הקודמות">
+      <label class="mode"><input type="radio" name="whMode" value="all" checked><span><b>כן</b><small>מדרגות המס בלבד – אין צורך להזין זיכויים</small></span></label>
+      <label class="mode"><input type="radio" name="whMode" value="some"><span><b>כן, בחלק מהשנים</b><small>מסמנים למטה באילו שנים</small></span></label>
+      <label class="mode"><input type="radio" name="whMode" value="none"><span><b>לא</b><small>משתמשים בנקודות הזיכוי והזיכויים</small></span></label>
+      <label class="mode"><input type="radio" name="whMode" value="full"><span><b>נוכה מס, אבל לחשב במלואו</b><small>נקודות זיכוי וזיכויים בכל השנים</small></span></label>
+    </div>
+    <div id="whYears" hidden>
+      <p class="note">סמנו את השנים שבהן נוכה מס לפי 106:</p>
+      <div class="whlist" id="whList"></div>
+    </div>
+    <p class="note" id="noCredits" hidden>בכל השנים הקודמות נוכה מס, ולכן אין צורך בנקודות זיכוי וזיכויים. אפשר לעבור לטבלה.</p>
+
+    <div id="profileArea" class="stack" style="display:grid;gap:16px">
+      <p class="note" id="profileFor"></p>
+      <div class="grid">
+        <label>מין<select id="gender"><option value="M">גבר</option><option value="F">אישה</option></select></label>
+        <label>טבלת נקודות ילדים<select id="childTable">
+          <option value="B">גבר, או הורה שאינו מקבל קצבת ילדים</option>
+          <option value="A">אישה, או הורה שמקבל קצבת ילדים</option></select></label>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
+        <label class="check"><input type="checkbox" id="loneParent"> חד הורי (נקודת זיכוי נוספת)</label>
+        <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (שתי טבלאות הילדים + נקודה)</label>
+      </div>
+
+      <h3>נקודות זיכוי</h3>
+      <div class="group">
+        <details class="sub" id="secKids">
+          <summary>ילדים <span class="cnt" id="cntKids"></span></summary>
+          <div class="list" id="kids"></div>
+          <div><button type="button" class="ghost" id="addKid">+ הוסף ילד</button></div>
+        </details>
+        <details class="sub" id="secImm">
+          <summary>עולה חדש / תושב חוזר <span class="cnt" id="cntImm"></span></summary>
+          <div class="row"><label>חודש עלייה / חזרה<input type="month" id="immigrant" min="2015-01" max="2026-12"></label></div>
+        </details>
+        <details class="sub" id="secSol">
+          <summary>חייל משוחרר / שירות לאומי <span class="cnt" id="cntSol"></span></summary>
+          <div class="row">
+            <label>חודש שחרור<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
+            <label class="check" style="flex:0 1 auto"><input type="checkbox" id="fullService" checked> שירות מלא (גבר 23 חודשים / אישה 22)</label>
+          </div>
+        </details>
+        <details class="sub" id="secRes">
+          <summary>לוחם מילואים <span class="cnt" id="cntRes"></span></summary>
+          <div class="row"><label>ימי מילואים כלוחם ב-2025 (לשנת המס 2026)<input class="num" id="reserve2025" inputmode="numeric" placeholder="0"></label></div>
+          <p class="note">סעיף 39ב, הוראת שעה 2026–2027: 30–39 ימים 0.5 נקודה, 40–49 ימים 0.75, מ-50 ימים נקודה אחת ועוד 0.25 לכל 5 ימים נוספים, עד 4 נקודות.</p>
+        </details>
+        <details class="sub" id="secAlim">
+          <summary>מזונות לבן זוג לשעבר <span class="cnt" id="cntAlim"></span></summary>
+          <div class="row"><label>שנת הנישואין מחדש<input class="num" id="alimonyFrom" inputmode="numeric" placeholder="לא רלוונטי"></label></div>
+          <p class="note">נקודת זיכוי אחת לגרוש/ה שנישא/ה מחדש, כשהוא/היא או בן/בת הזוג משלמים מזונות לבן/בת הזוג לשעבר. ניתנת מהשנה שבה נישא/ה מחדש.</p>
+        </details>
+        <details class="sub" id="secDeg">
+          <summary>תואר אקדמי / תעודת מקצוע <span class="cnt" id="cntDeg"></span></summary>
+          <div class="row"><label style="flex:0 1 260px">הטבה שנבחרה<select id="eduTrack">
+            <option value="">אוטומטי (תארים אם הוזנו)</option><option value="degrees">תארים</option><option value="cert">תעודת מקצוע</option></select></label></div>
+          <p class="note">אפשר לקבל נקודות על תארים או על תעודת מקצוע, לא על שניהם. תואר ראשון ושני מצטרפים. תואר שלישי ישיר ניתן בנוסף לתואר ראשון, אבל לא בנוסף לתואר שני. רפואה: על בסיס תואר ראשון שנוצל ניתנת רק חצי הנקודה, ועם תואר ראשון ושני – אין הטבה.</p>
+          <div class="list" id="degrees"></div>
+          <div><button type="button" class="ghost" id="addDegree">+ הוסף תואר / תעודה</button></div>
+        </details>
+      </div>
+
+      <h3>זיכויים בשקלים</h3>
+      <p class="lead">הזיכויים מחושבים על ההכנסה הרגילה של כל שנה (שמזינים בשלב ד), ואינם משתנים בגלל הסכום המיוחס.</p>
+      <div class="group" id="creditGroups"></div>
+
+      <h3>סיכום לכל שנה</h3>
+      <p class="lead">הנקודות מחושבות מהפרטים שלמעלה. אפשר לתקן ידנית, ומחיקת הערך מחזירה לחישוב האוטומטי.</p>
+      <div class="scroll">
+        <table class="ptsum" id="ptsTable">
+          <thead><tr><th>שנת מס</th><th>נקודות זיכוי</th><th>פירוט</th><th>זיכויים (₪)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="nav"><button type="button" data-prev>→ הקודם</button><span class="grow"></span><button type="button" class="primary" data-next>הבא: טבלה ותוצאה ←</button></div>
+  </section>
+
+  <!-- ===== step D ===== -->
+  <section class="panel" id="step4" data-step="4" hidden>
+    <h2>ד. טבלה ותוצאה</h2>
+    <p class="lead"><b>הכנסה חייבת: מזינים את סך ההכנסות החייבות במס שולי של הנישום בכל שנה, בלי הסכום שנפרס.</b> אם בשנה מסוימת לא הייתה הכנסה, מזינים 0.</p>
     <div class="scroll">
       <table id="ledger">
-        <thead><tr>
-          <th>שנת מס</th><th>הכנסה חייבת במס שולי (₪)</th><th>סכום מיוחס (₪)</th><th>נקודות זיכוי</th><th>זיכויים (₪)</th>
-          <th>מס על ההכנסה</th><th>מס כולל ייחוס</th><th>מס על הסכום המיוחס</th><th>שיעור</th><th></th>
-        </tr></thead>
+        <thead><tr><th>שנת מס</th><th>הכנסה חייבת במס שולי (₪)</th><th>סכום מיוחס (₪)</th><th>מס על הסכום המיוחס</th><th class="rate">שיעור</th></tr></thead>
         <tbody></tbody>
-        <tfoot><tr><td>סה"כ</td><td></td><td id="sumAlloc"></td><td></td><td></td><td></td><td></td><td id="sumTax"></td><td id="sumRate"></td><td></td></tr></tfoot>
+        <tfoot><tr><td>סה"כ</td><td></td><td id="sumAlloc"></td><td id="sumTax"></td><td id="sumRate" class="rate"></td></tr></tfoot>
       </table>
     </div>
     <div id="alert" class="alert" hidden></div>
-  </section>
 
-  <section class="panel" id="profilePanel">
-    <h2>פרטי הנישום לחישוב נקודות זיכוי</h2>
-    <div class="paybox" id="payBox" hidden>
-      <h3>שנת קבלת הכספים <span id="pbYear"></span> – נקודות זיכוי (שדה 038) וזיכויים</h3>
-      <div class="row">
-        <label>נקודות זיכוי<input class="num pts" id="ptPay" inputmode="decimal"></label>
-        <label>זיכויים (₪)<button type="button" class="ghost crbtn" id="crPayBtn"><span id="pbCr"></span> ▾</button></label>
-      </div>
-      <div class="ptsbreak" id="pbBreak" style="max-width:none"></div>
-      <p class="note">הנקודות מחושבות מהפרטים שלמטה. אפשר לתקן ידנית, ומחיקת הערך מחזירה לחישוב האוטומטי. הזיכויים נפתחים מתחת לטבלה.</p>
-    </div>
-    <p class="note">הפרטים כאן משמשים רק לחישוב, ואינם מודפסים ב-PDF. נקודות הזיכוי מחושבות לכל שנה בנפרד, ואפשר לתקן כל שנה ידנית בטבלה.</p>
-    <div class="grid">
-      <label>מין<select id="gender"><option value="M">גבר</option><option value="F">אישה</option></select></label>
-      <label>טבלת נקודות ילדים<select id="childTable">
-        <option value="B">גבר, או הורה שאינו מקבל קצבת ילדים</option>
-        <option value="A">אישה, או הורה שמקבל קצבת ילדים</option></select></label>
-      <label class="check"><input type="checkbox" id="resident" checked> תושב ישראל</label>
-      <label class="check"><input type="checkbox" id="loneParent"> חד הורי (נקודת זיכוי נוספת)</label>
-      <label class="check"><input type="checkbox" id="singleParent"> הורה יחיד (שתי טבלאות הילדים + נקודה)</label>
-    </div>
-
-    <details class="sub" id="secKids">
-      <summary>ילדים <span class="cnt" id="cntKids"></span></summary>
-      <div class="list" id="kids"></div>
-      <div><button type="button" class="ghost" id="addKid">+ הוסף ילד</button></div>
-    </details>
-
-    <details class="sub" id="secImm">
-      <summary>עולה חדש / תושב חוזר <span class="cnt" id="cntImm"></span></summary>
-      <div class="row"><label>חודש עלייה / חזרה<input type="month" id="immigrant" min="2015-01" max="2026-12"></label></div>
-    </details>
-
-    <details class="sub" id="secSol">
-      <summary>חייל משוחרר / שירות לאומי <span class="cnt" id="cntSol"></span></summary>
-      <div class="row">
-        <label>חודש שחרור<input type="month" id="discharge" min="2015-01" max="2026-12"></label>
-        <label class="check" style="flex:0 1 auto"><input type="checkbox" id="fullService" checked> שירות מלא (גבר 23 חודשים / אישה 22)</label>
-      </div>
-    </details>
-
-    <details class="sub" id="secRes">
-      <summary>לוחם מילואים <span class="cnt" id="cntRes"></span></summary>
-      <div class="row"><label>ימי מילואים כלוחם ב-2025 (לשנת המס 2026)<input class="num" id="reserve2025" inputmode="numeric" placeholder="0"></label></div>
-      <p class="note">סעיף 39ב, הוראת שעה 2026–2027: 30–39 ימים 0.5 נקודה, 40–49 ימים 0.75, מ-50 ימים נקודה אחת ועוד 0.25 לכל 5 ימים נוספים, עד 4 נקודות.</p>
-    </details>
-
-    <details class="sub" id="secAlim">
-      <summary>מזונות לבן זוג לשעבר <span class="cnt" id="cntAlim"></span></summary>
-      <div class="row"><label>שנת הנישואין מחדש<input class="num" id="alimonyFrom" inputmode="numeric" placeholder="לא רלוונטי"></label></div>
-      <p class="note">נקודת זיכוי אחת לגרוש/ה שנישא/ה מחדש, כשהוא/היא או בן/בת הזוג משלמים מזונות לבן/בת הזוג לשעבר. ניתנת מהשנה שבה נישא/ה מחדש.</p>
-    </details>
-
-    <details class="sub" id="secDeg">
-      <summary>תואר אקדמי / תעודת מקצוע <span class="cnt" id="cntDeg"></span></summary>
-      <div class="row"><label style="flex:0 1 260px">הטבה שנבחרה<select id="eduTrack">
-        <option value="">אוטומטי (תארים אם הוזנו)</option><option value="degrees">תארים</option><option value="cert">תעודת מקצוע</option></select></label></div>
-      <p class="note">אפשר לקבל נקודות על תארים או על תעודת מקצוע, לא על שניהם. תואר ראשון ושני מצטרפים. תואר שלישי ישיר ניתן בנוסף לתואר ראשון, אבל לא בנוסף לתואר שני. רפואה: על בסיס תואר ראשון שנוצל ניתנת רק חצי הנקודה, ועם תואר ראשון ושני – אין הטבה.</p>
-      <div class="list" id="degrees"></div>
-      <div><button type="button" class="ghost" id="addDegree">+ הוסף תואר / תעודה</button></div>
-    </details>
-  </section>
-
-  <section class="panel">
-    <h2>תוצאה</h2>
     <div class="summary">
       <div class="stat key" id="statRate"><div class="k" id="kRate">מקדמת מס (שיעור)</div><div class="v" id="rRate"></div></div>
       <div class="stat" id="statTax"><div class="k" id="kTax">מקדמת מס (₪)</div><div class="v" id="rTax"></div></div>
@@ -274,42 +319,41 @@ tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none}
     </div>
     <p class="note" id="payPart" hidden></p>
     <div id="warn" class="warnbox" hidden></div>
+
+    <div class="sub2" id="certPanel">
+      <h3>אישור תיאום מס – <span id="cYear"></span></h3>
+      <p class="note">מערכת השכר מחשבת את התשלום כהכנסה רגילה של השנה השוטפת. הזיכוי המאולץ הוא הפער בין המס שהמערכת תחשב לבין המס לפי הפריסה. ההכנסה השוטפת נלקחת מהשורה של שנת התשלום בטבלה.</p>
+      <div class="summary">
+        <div class="stat"><div class="k">סך הסכום שנפרס</div><div class="v" id="cTotal"></div></div>
+        <div class="stat"><div class="k">מס שתחשב מערכת השכר (בלי פריסה)</div><div class="v" id="cSystem"></div></div>
+        <div class="stat"><div class="k">מקדמת מס לפי הפריסה</div><div class="v" id="cDue"></div></div>
+        <div class="stat key"><div class="k">זיכוי מאולץ (₪)</div><div class="v" id="cForced"></div></div>
+      </div>
+      <div class="actions"><button id="pdfCert" type="button" class="primary">PDF – אישור תיאום מס</button></div>
+    </div>
+
+    <div class="sub2" id="refundPanel">
+      <h3>דוח החזר מס – שנת הדוח <span id="rfYear"></span></h3>
+      <p class="note">ההכנסה והמס שמיוחסים לשנים קודמות מופחתים מההכנסה ומהמס שנוכה בשנת הדוח. אם השדות נשארים ריקים, השורות ב-PDF יישארו למילוי ידני.</p>
+      <div class="grid">
+        <label><span id="lInc106">פיצויים חייבים בשנת הדוח (₪)</span><input id="inc106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
+        <label>סה"כ מס שנוכה בשנת הדוח (₪)<input id="tax106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
+      </div>
+      <div class="scroll"><table class="adj">
+        <thead><tr><th></th><th id="hInc">פיצויים חייבים</th><th>מס שנוכה</th></tr></thead>
+        <tbody>
+          <tr><td>בשנת הדוח</td><td id="aInc106"></td><td id="aTax106"></td></tr>
+          <tr><td>בניכוי המיוחס לשנים קודמות</td><td id="aPrevInc"></td><td id="aPrevTax"></td></tr>
+        </tbody>
+        <tfoot><tr><td>לדיווח בשנת הדוח</td><td id="aInc"></td><td id="aTax"></td></tr></tfoot>
+      </table></div>
+      <label class="check"><input type="checkbox" id="annualFull"> חישוב המס הכולל לשנת הדוח (מקדמה, שיעור והשוואה למס ללא פריסה). דורש הזנת ההכנסות בשנת קבלת הכספים.</label>
+      <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
+    </div>
     <p class="note">בכל קובץ PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
     <span id="pdfMsg" role="status" class="note"></span>
+    <div class="nav"><button type="button" data-prev>→ הקודם</button><span class="grow"></span></div>
   </section>
-
-  <section class="panel" id="certPanel">
-    <h2>אישור תיאום מס – 2026</h2>
-    <p class="note">מערכת השכר מחשבת את התשלום כהכנסה רגילה של השנה השוטפת. הזיכוי המאולץ הוא הפער בין המס שהמערכת תחשב לבין המס לפי הפריסה. ההכנסה השוטפת נלקחת מהשורה של שנת התשלום בטבלה.</p>
-    <div class="summary">
-      <div class="stat"><div class="k">סך הסכום שנפרס</div><div class="v" id="cTotal"></div></div>
-      <div class="stat"><div class="k">מס שתחשב מערכת השכר (בלי פריסה)</div><div class="v" id="cSystem"></div></div>
-      <div class="stat"><div class="k">מקדמת מס לפי הפריסה</div><div class="v" id="cDue"></div></div>
-      <div class="stat key"><div class="k">זיכוי מאולץ (₪)</div><div class="v" id="cForced"></div></div>
-    </div>
-    <div class="actions"><button id="pdfCert" type="button" class="primary">PDF – אישור תיאום מס</button></div>
-  </section>
-
-  <section class="panel" id="refundPanel">
-    <h2>דוח החזר מס – שנת הדוח <span id="rfYear"></span></h2>
-    <p class="note">ההכנסה והמס שמיוחסים לשנים קודמות מופחתים מההכנסה ומהמס שנוכה בשנת הדוח. אם השדות נשארים ריקים, השורות ב-PDF יישארו למילוי ידני.</p>
-    <div class="grid">
-      <label><span id="lInc106">פיצויים חייבים בשנת הדוח (₪)</span><input id="inc106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
-      <label>סה"כ מס שנוכה בשנת הדוח (₪)<input id="tax106" class="num" inputmode="numeric" placeholder="לא הוזן"></label>
-    </div>
-    <div class="scroll"><table class="adj">
-      <thead><tr><th></th><th id="hInc">פיצויים חייבים</th><th>מס שנוכה</th></tr></thead>
-      <tbody>
-        <tr><td>בשנת הדוח</td><td id="aInc106"></td><td id="aTax106"></td></tr>
-        <tr><td>בניכוי המיוחס לשנים קודמות</td><td id="aPrevInc"></td><td id="aPrevTax"></td></tr>
-      </tbody>
-      <tfoot><tr><td>לדיווח בשנת הדוח</td><td id="aInc"></td><td id="aTax"></td></tr></tfoot>
-    </table></div>
-    <label class="check"><input type="checkbox" id="annualFull"> חישוב המס הכולל לשנת הדוח (מקדמה, שיעור והשוואה למס ללא פריסה). דורש הזנת ההכנסות בשנת קבלת הכספים.</label>
-    <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
-  </section>
-  </div>
-
 </div>
 
 <div id="sheet" aria-hidden="true"></div>
@@ -328,19 +372,21 @@ const ptsFmt = v => (Math.round(v * 100) / 100).toString();
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const TYPE_NOTE = {
-  salary: 'הפרשי שכר מיוחסים לשנים שאליהן הם מתייחסים. אפשר לחלק בשווה או להזין סכום לכל שנה.',
+  salary: 'הפרשי שכר מיוחסים לשנים שאליהן הם מתייחסים. אפשר לחלק בשווה או לשנות את הסכום של כל שנה בטבלה.',
   severance: 'פריסת פיצויים אחורה: חלקים שנתיים שווים על פני עד 6 שנות מס שמסתיימות בשנת התשלום, ורק על שנות עבודה. הזינו רק את החלק החייב, אחרי הפטור.',
-  other: 'ייחוס חופשי לשנים שעד שנת התשלום.',
+  other: 'ייחוס חופשי לשנים שעד שנת התשלום. אפשר לחלק בשווה או לשנות את הסכום של כל שנה בטבלה.',
 };
 
 // ---- state ----
+const blankProfile = () => ({ gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] });
 const state = {
+  step: 1,
   mode: null,  // 'coord' (tax coordination, 2026) | 'annual' (annual report, 2020-2025)
-  type: 'salary', payYear: 2026, total: 100000, sevYears: 5,
-  profile: { gender: 'M', childTable: 'B', resident: true, singleParent: false, loneParent: false, children: [], immigrant: '', soldier: { discharge: '', full: true }, degrees: [] },
+  type: 'salary', payYear: 2026, total: 0, sevYears: 5,
+  profile: blankProfile(),
   refund: { inc106: null, tax106: null },
   alloc: {},   // year -> amount
-  data: {},    // year -> { base, cr (credit inputs), ptsOverride }
+  data: {},    // year -> { base, cr (credit inputs), ptsOverride, withheld }
 };
 const yd = y => (state.data[y] ||= { base: null, cr: {}, ptsOverride: null }); // base null = not entered (counts as 0)
 
@@ -361,10 +407,11 @@ function creditsFor(y) { return E.shekelCredits(y, yd(y).base || 0, yd(y).cr); }
 
 // "Brackets only": prior years are taxed by the brackets alone, without credit points or credits.
 // The payment year always keeps its points and credits (as payroll computes it).
-const withheld = y => yd(y).withheld !== false;   // annual report: tax withheld per 106 in that year (default yes)
+const withheld = y => yd(y).withheld !== false;   // tax withheld per 106 in that year (default yes)
 const whMode = () => state.whMode || 'all';   // all | some | none | full
 const bracketsOnly = y => y < state.payYear && (whMode() === 'all' || (whMode() === 'some' && withheld(y)));
-const profileNeeded = () => state.mode === 'coord' || whMode() !== 'all' || !!state.annualFull;
+// The payment year's share in an annual report stays in that year and is not taxed here, so it needs no credits.
+const creditYears = () => years().filter(y => !bracketsOnly(y) && !(annualShort() && y === state.payYear));
 const effPts = y => bracketsOnly(y) ? 0 : pointsFor(y).value;
 const effCr = y => bracketsOnly(y) ? { total: 0, items: [] } : creditsFor(y);
 
@@ -376,9 +423,54 @@ function buildInput() {
   return { total: state.total, payYear: state.payYear, lines, pay: { base: p.base || 0, points: pointsFor(state.payYear).value, extraCredit: creditsFor(state.payYear).total } };
 }
 
+// ---- wizard ----
+function stepErrors(n) {
+  if (n >= 2 && !state.mode) return ['בחרו את מטרת החישוב.'];
+  if (n >= 3) {
+    if (!(state.total > 0)) return ['הזינו את הסכום החייב במס.'];
+    const errs = E.validate(buildInput(), state.type);
+    if (!Object.keys(state.alloc).length) errs.unshift('לא הוגדרו שנים לייחוס.');
+    return errs;
+  }
+  return [];
+}
+const reachable = n => stepErrors(n).length === 0;
+function go(n) {
+  if (n > state.step && !reachable(n)) { calc(); return; }
+  state.step = n;
+  for (const s of document.querySelectorAll('section[data-step]')) s.hidden = +s.dataset.step !== n;
+  renderStep();
+  $('step' + n).querySelector('h2').scrollIntoView({ block: 'nearest' });
+}
+function renderStepper() {
+  for (const b of document.querySelectorAll('.steps button')) {
+    const n = +b.dataset.go;
+    if (n === state.step) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+    b.classList.toggle('done', n < state.step);
+    b.disabled = n !== state.step && !reachable(n);
+  }
+}
+function renderStep() {
+  if (state.step === 2) renderAlloc();
+  if (state.step === 3) renderCreditsStep();
+  if (state.step === 4) renderLedger();
+  calc();
+}
+
 // ---- rendering ----
 function yearOptions(sel, val, max) {
   sel.innerHTML = E.YEARS.filter(y => y <= (max ?? E.MAX_YEAR)).map(y => `<option${y === val ? ' selected' : ''}>${y}</option>`).join('');
+}
+
+function renderAlloc() {
+  const sev = state.type === 'severance';
+  const ys = Object.keys(state.alloc).map(Number).sort((a, b) => a - b);
+  $('allocTable').tBodies[0].innerHTML = ys.map(y => `<tr data-ay="${y}">
+    <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
+    <td><input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}></td>
+    <td>${sev ? '' : `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר את ${y}">✕</button>`}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="note">עוד לא הוגדרו שנים. בחרו טווח שנים ולחצו "חלק בשווה".</td></tr>';
+  $('addYear').hidden = sev;
 }
 
 function renderKids() {
@@ -404,57 +496,82 @@ function renderDegrees() {
     <button type="button" class="ghost" data-deldeg="${i}" aria-label="הסר">✕</button></div>`).join('') || '<p class="note">לא הוזנה השכלה.</p>';
 }
 
-function renderLedger() {
-  const sev = state.type === 'severance';
-  $('ledger').tBodies[0].innerHTML = years().map(y => {
-    const allocated = Object.prototype.hasOwnProperty.call(state.alloc, y);
-    const d = yd(y), pf = pointsFor(y);
-    return `<tr data-y="${y}" class="${y === state.payYear ? 'payrow' : ''}">
-      <td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>
-      <td>${annualShort() && y === state.payYear ? '<span class="note">לא נדרש</span>' : `<input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן" title="סך ההכנסות החייבות במס שולי של הנישום, ללא הסכום מהפריסה">`}
-        ${whMode() === 'some' && y < state.payYear ? `<label class="wh">נוכה מס לפי 106?<select id="wh${y}" data-f="withheld">
-          <option value="1"${withheld(y) ? ' selected' : ''}>כן – מדרגות בלבד</option><option value="0"${withheld(y) ? '' : ' selected'}>לא – כולל זיכויים</option></select></label>` : ''}</td>
-      <td>${allocated ? `<input class="num" id="al${y}" data-f="alloc" inputmode="numeric" value="${fmt(state.alloc[y])}"${sev ? ' readonly' : ''}>` : '<span class="note">להשוואה בלבד</span>'}</td>
-      <td><input class="num pts${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}">
-        <div class="ptsbreak" data-o="br"></div></td>
-      <td><button type="button" class="ghost crbtn" data-cr="${y}" aria-expanded="false" aria-controls="crrow${y}"><span data-o="cr"></span> ▾</button>
-        <div class="ptsbreak" data-o="crbr"></div></td>
-      <td data-o="t0"></td><td data-o="t1"></td><td data-o="add"></td><td data-o="rate"></td>
-      <td>${allocated && !sev ? `<button type="button" class="ghost" data-delyear="${y}" aria-label="הסר שנה">✕</button>` : ''}</td></tr>
-    <tr class="credrow" id="crrow${y}" data-cy="${y}"${openCredits.has(y) ? '' : ' hidden'}><td colspan="10">${creditForm(y)}</td></tr>`;
-  }).join('');
-  calc();
-}
-
-const openCredits = new Set();
-const CR_FIELDS = [
-  ['settleRate', 'יישוב מזכה – שיעור (%)', 'decimal'], ['settleCeil', 'יישוב מזכה – תקרה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים בשנה', 'numeric'],
-  ['eilatIncome', 'אילת – הכנסה שהופקה באילת (₪)', 'numeric'],
-  ['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric'],
-  ['donation', 'תרומות (₪)', 'numeric'], ['shiftWage', 'שכר משמרות בתעשייה (₪)', 'numeric'],
-  ['soldierSalary', 'חייל – משכורת מיוחדת (₪)', 'numeric'], ['soldierCeil', 'חייל – תקרה (₪)', 'numeric', y => E.CREDIT_PARAMS[y].soldierCeil == null],
-  ['other', 'זיכוי אחר (₪)', 'numeric'],
+// Shekel credits: one collapsible row per kind, each with a small table by year.
+const P_ = y => E.CREDIT_PARAMS[y] || {};
+const CREDIT_GROUPS = [
+  { id: 'settle', title: 'אישור תושב – יישוב מזכה', copy: ['settleRate', 'settleCeil', 'settleMonths'],
+    cols: [['settleRate', 'שיעור (%)', 'decimal'], ['settleCeil', 'תקרת הכנסה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים', 'numeric', '12']],
+    note: 'לפי אישור התושב: שיעור הזיכוי ותקרת ההכנסה של היישוב באותה שנה. הזיכוי = שיעור × ההכנסה עד התקרה × חודשי המגורים / 12.' },
+  { id: 'eilat', title: 'אילת', copy: ['eilatIncome'], cols: [['eilatIncome', 'הכנסה שהופקה באילת (₪)', 'numeric']],
+    lim: y => `תקרה ${fmt(P_(y).eilatCeil)}`, note: 'זיכוי של 10% מההכנסה שהופקה באילת, עד התקרה השנתית.' },
+  { id: 'pension', title: 'פנסיה וביטוח חיים', cols: [['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric']],
+    note: 'פנסיה 35%, ביטוח חיים 25% מהסכום המזכה.' },
+  { id: 'donation', title: 'תרומות', cols: [['donation', 'סכום התרומות (₪)', 'numeric']],
+    lim: y => `מינימום ${fmt(P_(y).donationMin)}${(P_(y).assumed || []).includes('donationMin') ? ' (הנחה)' : ''}`, note: '35% מהתרומות שמעל המינימום, ועד 30% מההכנסה החייבת.' },
+  { id: 'shift', title: 'עבודה במשמרות בתעשייה', cols: [['shiftWage', 'שכר משמרות (₪)', 'numeric']],
+    lim: y => `תקרת הכנסה ${fmt(P_(y).shiftCeil)} · זיכוי עד ${fmt(P_(y).shiftMax)}`, note: '15% משכר המשמרות, בתוך תקרת ההכנסה השנתית.' },
+  { id: 'soldier', title: 'חייל במשכורת מיוחדת', cols: [['soldierSalary', 'משכורת מיוחדת (₪)', 'numeric']],
+    lim: y => `תקרה ${fmt(P_(y).soldierCeil)}`, note: '5% עד התקרה. הזיכוי ניתן במקום יישוב מזכה – נלקח הגבוה מביניהם.' },
+  { id: 'other', title: 'זיכוי אחר', cols: [['other', 'זיכוי בשקלים (₪)', 'numeric']], note: 'זיכוי בשקלים שלא מופיע ברשימה, כפי שהוא.' },
 ];
-function paramNote(y) {
-  const P = E.CREDIT_PARAMS[y] || {}, a = P.assumed || [];
-  const v = (k, txt) => P[k] == null ? `${txt}: לא בחומר` : `${txt}: ${fmt(P[k])}${a.includes(k) ? ' (הנחה)' : ''}`;
-  return [v('eilatCeil', 'תקרת אילת'), v('donationMin', 'תרומה מזערית'), v('shiftMax', 'זיכוי משמרות מרבי'), v('shiftCeil', 'תקרת הכנסה למשמרות'),
-    P.soldierCeil == null ? 'תקרת חייל: אין בחומר, הזינו בשדה' : v('soldierCeil', 'תקרת חייל')].join(' · ');
+const openGroups = new Set();
+function groupCount(g) {
+  const n = creditYears().filter(y => g.cols.some(([k]) => yd(y).cr[k] != null)).length;
+  return n ? `(${n === 1 ? 'שנה אחת' : n + ' שנים'})` : '';
 }
-function creditForm(y) {
-  const cr = yd(y).cr;
-  return `<div class="crform">
-    <div class="crgrid">${CR_FIELDS.filter(f => !f[3] || f[3](y)).map(([k, label, mode]) => `<label>${label}<input class="num" id="cr${k}${y}" data-c="${k}" inputmode="${mode}"
-      value="${cr[k] == null ? '' : (mode === 'numeric' ? fmt(cr[k]) : cr[k])}" placeholder="${k === 'settleMonths' ? '12' : '0'}"></label>`).join('')}</div>
-    <p class="note">שווי הזיכויים מחושב על ההכנסה הרגילה של ${y}, ואינו משתנה בגלל הסכום המיוחס. פנסיה 35%, ביטוח חיים 25%, תרומות 35%, משמרות 15%, אילת 10%, חייל 5% (במקום יישוב מזכה, הגבוה מביניהם). ${paramNote(y)}.</p>
-    <div class="actions"><button type="button" class="ghost" data-crcopy="${y}">העתק את נתוני היישוב והאילת לכל השנים</button></div>
-  </div>`;
+function renderCreditGroups() {
+  const ys = creditYears();
+  $('creditGroups').innerHTML = CREDIT_GROUPS.map(g => `<details class="sub" id="cg-${g.id}"${openGroups.has(g.id) ? ' open' : ''}>
+    <summary>${g.title} <span class="cnt" data-cnt="${g.id}">${groupCount(g)}</span></summary>
+    <p class="note">${g.note}</p>
+    <div class="scroll"><table class="ytable">
+      <thead><tr><th>שנת מס</th>${g.cols.map(c => `<th>${c[1]}</th>`).join('')}${g.lim ? '<th></th>' : ''}</tr></thead>
+      <tbody>${ys.map(y => `<tr><td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>${g.cols.map(([k, , mode, ph]) => {
+        const v = yd(y).cr[k];
+        return `<td><input class="num" id="cr${k}${y}" data-c="${k}" data-y="${y}" inputmode="${mode}" value="${v == null ? '' : (mode === 'numeric' ? fmt(v) : v)}" placeholder="${ph || '0'}"></td>`;
+      }).join('')}${g.lim ? `<td class="lim">${g.lim(y)}</td>` : ''}</tr>`).join('')}</tbody>
+    </table></div>
+    ${g.copy && ys.length > 1 ? `<div><button type="button" class="ghost" data-crcopy="${g.id}">העתק את השורה של ${ys[0]} לכל השנים</button></div>` : ''}
+  </details>`).join('');
 }
 
 function breakdownHtml(y) {
   const pf = pointsFor(y);
   const parts = pf.auto.items.map(i => `${esc(i.label)} ${ptsFmt(i.pts)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`);
   return (pf.overridden ? `<span class="v">ידני. אוטומטי: ${ptsFmt(pf.auto.total)}</span> · ` : '') + parts.join(' · ');
+}
+function renderPtsTable() {
+  $('ptsTable').tBodies[0].innerHTML = creditYears().map(y => {
+    const pf = pointsFor(y), isPay = y === state.payYear;
+    return `<tr data-py="${y}" class="${isPay ? 'payrow' : ''}">
+      <td>${y}${isPay ? `<span class="tag">${state.mode === 'coord' ? 'שנת התשלום · שדה 038' : 'שנת התשלום'}</span>` : ''}</td>
+      <td><input class="num${pf.overridden ? ' override' : ''}" id="pt${y}" data-f="pts" inputmode="decimal" value="${ptsFmt(pf.value)}" title="${pf.overridden ? 'תוקן ידנית. מחקו את הערך כדי לחזור לחישוב האוטומטי' : 'מחושב אוטומטית'}"></td>
+      <td><div class="ptsbreak" data-o="br"></div></td>
+      <td data-o="cr"></td></tr>`;
+  }).join('');
+}
+function renderCreditsStep() {
+  const prior = Object.keys(state.alloc).map(Number).filter(y => y < state.payYear).sort((a, b) => a - b);
+  $('whYears').hidden = whMode() !== 'some';
+  $('whList').innerHTML = prior.map(y => `<label class="check"><input type="checkbox" id="wh${y}" data-wh="${y}"${withheld(y) ? ' checked' : ''}> ${y}</label>`).join('');
+  const ys = creditYears();
+  $('profileArea').hidden = !ys.length;
+  $('noCredits').hidden = ys.length > 0;
+  $('profileFor').textContent = ys.length ? `הזיכויים נדרשים לשנים: ${ys.join(', ')}.` : '';
+  renderCreditGroups();
+  renderPtsTable();
+}
+
+function renderLedger() {
+  $('ledger').tBodies[0].innerHTML = years().map(y => {
+    const allocated = Object.prototype.hasOwnProperty.call(state.alloc, y);
+    const d = yd(y), isPay = y === state.payYear;
+    return `<tr data-y="${y}" class="${isPay ? 'payrow' : ''}">
+      <td>${y}${isPay ? '<span class="tag">שנת התשלום</span>' : ''}</td>
+      <td>${annualShort() && isPay ? '<span class="note">לא נדרש</span>' : `<input class="num" id="ba${y}" data-f="base" inputmode="numeric" value="${d.base == null ? '' : fmt(d.base)}" placeholder="לא הוזן" title="סך ההכנסות החייבות במס שולי של הנישום, ללא הסכום מהפריסה">`}</td>
+      <td>${allocated ? fmt(state.alloc[y]) : '<span class="note">להשוואה בלבד</span>'}</td>
+      <td data-o="add"></td><td data-o="rate" class="rate"></td></tr>`;
+  }).join('');
 }
 
 const incWord = () => state.type === 'severance' ? 'פיצויים חייבים' : 'סכום חייב שהתקבל';
@@ -466,8 +583,8 @@ function applyLabels() {
   $('kPrevTax').textContent = annual ? 'מס שמיוחס לשנים קודמות (להפחתה מהמס שנוכה בשנת קבלת הכספים)' : 'סה"כ מס שמיוחס לשנים קודמות';
   $('lInc106').textContent = `${incWord()} בשנת הדוח (₪)`;
   $('hInc').textContent = incWord();
-  $('whNote').hidden = whMode() !== 'some';
-  $('profilePanel').hidden = !profileNeeded();
+  $('certPanel').hidden = state.mode !== 'coord';
+  $('refundPanel').hidden = state.mode !== 'annual';
 }
 
 let last = null;
@@ -476,40 +593,28 @@ function calc() {
   const input = buildInput();
   const r = E.computeSpread(input);
   const byYear = Object.fromEntries(r.lines.map(l => [l.year, l]));
+  // step B
+  $('allocSum').textContent = ils(Object.values(state.alloc).reduce((s, v) => s + v, 0));
+  // step C
+  for (const tr of $('ptsTable').tBodies[0].querySelectorAll('tr[data-py]')) {
+    const y = +tr.dataset.py, cr = creditsFor(y);
+    tr.querySelector('[data-o="br"]').innerHTML = breakdownHtml(y);
+    tr.querySelector('[data-o="cr"]').innerHTML = ils(cr.total) + (cr.items.length ? `<div class="ptsbreak">${cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ')}</div>` : '');
+  }
+  for (const g of CREDIT_GROUPS) { const el = document.querySelector(`[data-cnt="${g.id}"]`); if (el) el.textContent = groupCount(g); }
+  // step D
   for (const tr of $('ledger').tBodies[0].querySelectorAll('tr[data-y]')) {
-    const y = +tr.dataset.y, l = byYear[y], d = yd(y), pts = effPts(y), cr = effCr(y), bo = bracketsOnly(y);
-    const t0 = E.netTax(d.base || 0, y, pts, cr.total);
-    tr.classList.toggle('bonly', bo);
+    const y = +tr.dataset.y, l = byYear[y];
     if (annualShort() && y === state.payYear) {
-      for (const k of ['t0', 't1', 'rate']) tr.querySelector(`[data-o="${k}"]`).textContent = '';
-      tr.querySelector('[data-o="add"]').textContent = 'נשאר בשנת הדוח';
-      tr.querySelector('[data-o="cr"]').textContent = '—'; tr.querySelector('[data-o="crbr"]').innerHTML = ''; tr.querySelector('[data-o="br"]').innerHTML = '';
+      tr.querySelector('[data-o="add"]').textContent = 'נשאר בשנת הדוח'; tr.querySelector('[data-o="rate"]').textContent = '';
       continue;
     }
-    tr.querySelector('[data-o="cr"]').textContent = bo ? 'לא נכלל' : ils(cr.total);
-    tr.querySelector('[data-o="crbr"]').innerHTML = bo ? '' : cr.items.map(i => `${esc(i.label)} ${fmt(i.amount)}${i.verify ? '<span class="v"> (לאמת)</span>' : ''}`).join(' · ');
-    tr.querySelector('[data-o="br"]').innerHTML = bo ? '<span class="v">לא נכלל – מדרגות בלבד</span>' : breakdownHtml(y);
-    tr.querySelector('[data-o="t0"]').textContent = ils(t0);
-    tr.querySelector('[data-o="t1"]').textContent = l ? ils(l.t1) : '';
     tr.querySelector('[data-o="add"]').textContent = l ? ils(l.add) : '';
     tr.querySelector('[data-o="rate"]').textContent = l ? pct(l.rate) : '';
   }
-  // Short table when every prior year is brackets only (annual report).
+  // Short table (no rate column) when every prior year is brackets only.
   const priorYears = Object.keys(state.alloc).map(Number).filter(y => y < state.payYear);
-  const compact = priorYears.length > 0 && priorYears.every(bracketsOnly);
-  $('ledger').classList.toggle('compact', compact);
-  // Payment-year box (tax coordination): points for field 038 and credits.
-  const showBox = state.mode === 'coord';
-  $('payBox').hidden = !showBox;
-  if (showBox) {
-    const py = state.payYear, pf = pointsFor(py), pc = creditsFor(py);
-    $('pbYear').textContent = py;
-    if (document.activeElement !== $('ptPay')) $('ptPay').value = ptsFmt(pf.value);
-    $('ptPay').classList.toggle('override', pf.overridden);
-    $('pbCr').textContent = ils(pc.total);
-    $('crPayBtn').dataset.cr = py;
-    $('pbBreak').innerHTML = breakdownHtml(py) + (pc.items.length ? ' · ' + pc.items.map(i => `${esc(i.label)} ${fmt(i.amount)} ₪`).join(' · ') : '');
-  }
+  $('ledger').classList.toggle('compact', priorYears.length > 0 && priorYears.every(bracketsOnly));
   $('statRate').hidden = $('statTax').hidden = annualShort();
   $('statNoSpread').hidden = !(state.mode === 'annual' && state.annualFull);
   $('sumAlloc').textContent = ils(r.sumAlloc);
@@ -520,12 +625,12 @@ function calc() {
   $('rPrevInc').textContent = ils(prev.reduce((s, l) => s + l.alloc, 0));
   $('rPrevTax').textContent = ils(prev.reduce((s, l) => s + l.add, 0));
   $('payPart').hidden = !cur;
-  if (cur && annualShort()) { $('payPart').textContent = `חלק שנשאר בשנת הדוח ${state.payYear}: ${ils(cur.alloc)}. הוא אינו מופחת, והמס עליו לא מחושב כאן.`; }
-  else
-  if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
+  if (cur && annualShort()) $('payPart').textContent = `חלק שנשאר בשנת הדוח ${state.payYear}: ${ils(cur.alloc)}. הוא אינו מופחת, והמס עליו לא מחושב כאן.`;
+  else if (cur) $('payPart').textContent = `בנוסף מיוחסים לשנת התשלום ${state.payYear}: הכנסה ${ils(cur.alloc)}, מס ${ils(cur.add)}. סך המס על כל התשלום: ${ils(r.sumTax)}.`;
   $('rTax').textContent = ils(r.sumTax);
   $('rNoSpread').textContent = ils(r.noSpread);
   // current-year certificate
+  $('cYear').textContent = state.payYear;
   $('cTotal').textContent = ils(r.sumAlloc);
   $('cSystem').textContent = ils(r.noSpread);
   $('cDue').textContent = `${ils(r.sumTax)} · ${pct(r.rate)}`;
@@ -551,12 +656,13 @@ function calc() {
   $('warn').innerHTML = warns.map(esc).join('<br>');
   const errs = E.validate(input, state.type);
   if (!input.lines.length) errs.unshift('לא הוגדרו שנים לייחוס.');
-  $('alert').hidden = !errs.length;
-  $('alert').innerHTML = errs.map(esc).join('<br>');
+  for (const id of ['alert', 'alert2']) { $(id).hidden = !errs.length; $(id).innerHTML = errs.map(esc).join('<br>'); }
+  if (!(state.total > 0)) { $('alert2').hidden = false; $('alert2').innerHTML = 'הזינו את הסכום החייב במס.'; }
   for (const id of ['pdfCert', 'pdfRefund']) {
     $(id).disabled = errs.length > 0;
     $(id).title = errs.length ? 'יש לתקן את השגיאות לפני הפקת PDF' : '';
   }
+  renderStepper();
   last = { input, r, adj };
   return last;
 }
@@ -576,7 +682,7 @@ function applyType() {
   }
   yearOptions($('fromYear'), Math.max(E.MIN_YEAR, state.payYear - 5), state.payYear);
   yearOptions($('toYear'), state.payYear - 1 >= E.MIN_YEAR ? state.payYear - 1 : state.payYear, state.payYear);
-  renderLedger();
+  renderStep();
 }
 
 function split() {
@@ -585,53 +691,50 @@ function split() {
   const n = b - a + 1, share = Math.floor(state.total / n);
   state.alloc = {};
   for (let y = a; y <= b; y++) state.alloc[y] = y === b ? state.total - share * (n - 1) : share;
-  renderLedger();
+  renderStep();
 }
 
 // ---- events ----
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.id === 'annualFull') { state.annualFull = t.checked; renderLedger(); return; }
-  if (t.name === 'whMode') { state.whMode = t.value; renderLedger(); return; }
-  if (t.id === 'ptPay') {
-    const v = t.value.trim();
-    yd(state.payYear).ptsOverride = v === '' ? null : num(v);
-    const el = $('pt' + state.payYear); if (el) el.value = ptsFmt(pointsFor(state.payYear).value);
-    calc(); return;
-  }
+  if (t.id === 'annualFull') { state.annualFull = t.checked; renderLedger(); calc(); return; }
+  if (t.name === 'whMode') { state.whMode = t.value; renderCreditsStep(); calc(); return; }
+  if (t.dataset.wh) { yd(+t.dataset.wh).withheld = t.checked; renderCreditsStep(); calc(); return; }
   if (t.id === 'inc106' || t.id === 'tax106') { state.refund[t.id] = t.value.trim() === '' ? null : num(t.value); calc(); return; }
-  if (t.id === 'total') { state.total = num(t.value); if (state.type === 'severance') applyType(); else calc(); return; }
+  if (t.id === 'total') {
+    state.total = num(t.value);
+    if (state.type === 'severance') applyType();
+    else if (Object.keys(state.alloc).length <= 1 || Object.values(state.alloc).every(v => !v)) split();
+    else calc();
+    return;
+  }
   if (t.dataset.kid != null) { const c = state.profile.children[+t.dataset.kid]; c[t.dataset.f] = t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (t.dataset.deg != null) { const d = state.profile.degrees[+t.dataset.deg]; d[t.dataset.f] = t.tagName === 'SELECT' ? t.value : t.type === 'checkbox' ? t.checked : num(t.value); renderPointsOnly(); return; }
   if (['eduTrack', 'gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'reserve2025', 'alimonyFrom', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
-    const p = state.profile;
-    if (t.id === 'gender') $('childTable').value = t.value === 'F' ? 'A' : 'B';
-    p.gender = $('gender').value; p.childTable = $('childTable').value; p.eduTrack = $('eduTrack').value || null; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked; p.loneParent = $('loneParent').checked;
-    p.reserveDays = { 2025: num($('reserve2025').value) }; p.alimonyFrom = num($('alimonyFrom').value) || null;
-    p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
-    renderPointsOnly(); return;
+    readProfile(t.id === 'gender'); renderPointsOnly(); return;
   }
   if (t.dataset.c) {
-    const y = +t.closest('tr[data-cy]').dataset.cy;
+    const y = +t.dataset.y;
     const v = t.value.trim() === '' ? null : num(t.value);
     if (v == null) delete yd(y).cr[t.dataset.c]; else yd(y).cr[t.dataset.c] = v;
     calc(); return;
   }
-  const tr = t.closest('#ledger tr[data-y]');
-  if (tr) {
-    const y = +tr.dataset.y, f = t.dataset.f;
-    if (f === 'alloc') state.alloc[y] = num(t.value);
-    else if (f === 'base') yd(y).base = t.value.trim() === '' ? null : num(t.value);
-    else if (f === 'withheld') { yd(y).withheld = t.value === '1'; calc(); return; }
-    else if (f === 'extra') yd(y).extra = num(t.value);
-    else if (f === 'pts') {
-      yd(y).ptsOverride = t.value.trim() === '' ? null : num(t.value);
-      t.classList.toggle('override', yd(y).ptsOverride != null);
-    }
-    calc();
+  if (t.dataset.f === 'alloc') { state.alloc[+t.closest('tr').dataset.ay] = num(t.value); calc(); return; }
+  if (t.dataset.f === 'pts') {
+    const y = +t.closest('tr').dataset.py;
+    yd(y).ptsOverride = t.value.trim() === '' ? null : num(t.value);
+    t.classList.toggle('override', yd(y).ptsOverride != null);
+    calc(); return;
   }
+  if (t.dataset.f === 'base') { yd(+t.closest('tr').dataset.y).base = t.value.trim() === '' ? null : num(t.value); calc(); }
 });
-// Points inputs show auto values; refresh them without rebuilding rows while the user types elsewhere.
+function readProfile(genderChanged) {
+  const p = state.profile;
+  if (genderChanged) $('childTable').value = $('gender').value === 'F' ? 'A' : 'B';
+  p.gender = $('gender').value; p.childTable = $('childTable').value; p.eduTrack = $('eduTrack').value || null; p.resident = $('resident').checked; p.singleParent = $('singleParent').checked; p.loneParent = $('loneParent').checked;
+  p.reserveDays = { 2025: num($('reserve2025').value) }; p.alimonyFrom = num($('alimonyFrom').value) || null;
+  p.immigrant = $('immigrant').value; p.soldier = { discharge: $('discharge').value, full: $('fullService').checked };
+}
 function renderCounts() {
   const p = state.profile;
   $('cntKids').textContent = p.children.length ? `(${p.children.length})` : '';
@@ -641,44 +744,41 @@ function renderCounts() {
   $('cntAlim').textContent = p.alimonyFrom ? `(מ-${p.alimonyFrom})` : '';
   $('cntDeg').textContent = p.degrees.length ? `(${p.degrees.length})` : '';
 }
+// Points inputs show auto values; refresh them without rebuilding rows while the user types elsewhere.
 function renderPointsOnly() {
   renderCounts();
-  for (const y of years()) {
+  for (const y of creditYears()) {
     const el = $('pt' + y); if (!el || document.activeElement === el) continue;
-    const pf = pointsFor(y); el.value = ptsFmt(pf.value);
+    el.value = ptsFmt(pointsFor(y).value);
   }
   calc();
 }
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'ptPay') { calc(); return; }
-  if (t.id === 'payType') { state.type = t.value; applyType(); }
+  if (t.id === 'payType') { state.type = t.value; applyType(); if (state.type !== 'severance') split(); }
   else if (t.id === 'payYear') { state.payYear = +t.value; applyType(); }
   else if (t.id === 'sevYears') { state.sevYears = +t.value; applyType(); }
-  else if (t.dataset.f === 'pts' && t.value.trim() === '') { renderLedger(); }
+  else if (t.dataset.f === 'pts' && t.value.trim() === '') { renderPtsTable(); calc(); }
 });
+document.addEventListener('toggle', e => {
+  const d = e.target;
+  if (d.id && d.id.startsWith('cg-')) { if (d.open) openGroups.add(d.id.slice(3)); else openGroups.delete(d.id.slice(3)); }
+}, true);
 document.addEventListener('focusout', e => {
   const t = e.target;
   if (t.matches('input.num') && t.inputMode === 'numeric' && !t.dataset.kid && !t.dataset.deg && t.id !== 'alimonyFrom' && t.value.trim() !== '') t.value = fmt(num(t.value));
 });
 document.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.cr) {
-    const y = +t.dataset.cr, row = $('crrow' + y);
-    row.hidden = !row.hidden; t.setAttribute('aria-expanded', String(!row.hidden));
-    if (t.id === 'crPayBtn' && !row.hidden) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    if (row.hidden) openCredits.delete(y); else openCredits.add(y);
-    return;
-  }
+  if (t.dataset.go) { go(+t.dataset.go); return; }
+  if (t.hasAttribute('data-next')) { go(state.step + 1); return; }
+  if (t.hasAttribute('data-prev')) { go(state.step - 1); return; }
   if (t.dataset.crcopy) {
-    const src = yd(+t.dataset.crcopy).cr;
-    for (const y of years()) {
-      const cr = yd(y).cr;
-      for (const k of ['settleRate', 'settleCeil', 'settleMonths', 'eilatIncome']) { if (src[k] == null) delete cr[k]; else cr[k] = src[k]; }
-    }
-    renderLedger(); return;
+    const g = CREDIT_GROUPS.find(g => g.id === t.dataset.crcopy), ys = creditYears(), src = yd(ys[0]).cr;
+    for (const y of ys) for (const k of g.copy) { if (src[k] == null) delete yd(y).cr[k]; else yd(y).cr[k] = src[k]; }
+    renderCreditGroups(); calc(); return;
   }
-  if (t.dataset.delyear) { delete state.alloc[+t.dataset.delyear]; renderLedger(); }
+  if (t.dataset.delyear) { delete state.alloc[+t.dataset.delyear]; renderAlloc(); calc(); }
   else if (t.dataset.delkid) { state.profile.children.splice(+t.dataset.delkid, 1); renderKids(); renderPointsOnly(); }
   else if (t.dataset.deldeg) { state.profile.degrees.splice(+t.dataset.deldeg, 1); renderDegrees(); renderPointsOnly(); }
 });
@@ -687,7 +787,7 @@ $('addDegree').addEventListener('click', () => { state.profile.degrees.push({ ty
 $('addYear').addEventListener('click', () => {
   const y = [...E.YEARS].reverse().find(y => y <= state.payYear && !(y in state.alloc));
   if (y == null) return;
-  state.alloc[y] = 0; renderLedger();
+  state.alloc[y] = 0; renderAlloc(); calc();
 });
 $('splitBtn').addEventListener('click', split);
 
@@ -844,22 +944,40 @@ function setMode(mode) {
   if (!ys.includes(state.payYear)) state.payYear = ys[ys.length - 1];
   $('payYear').innerHTML = ys.map(y => `<option${y === state.payYear ? ' selected' : ''}>${y}</option>`).join('');
   $('payYear').disabled = ys.length === 1;
-  $('work').hidden = false;
-  $('modeHint').hidden = true;
-  $('certPanel').hidden = mode !== 'coord';
-  $('refundPanel').hidden = mode !== 'annual';
   applyType();
   if (state.type !== 'severance') split();
 }
 for (const id of ['modeCoord', 'modeAnnual']) $(id).addEventListener('change', e => setMode(e.target.value));
 
-// ---- init with example (marked as example in the header) ----
-$('total').value = fmt(state.total);
+// ---- clear everything and start again at step A ----
+function resetAll() {
+  Object.assign(state, { step: 1, mode: null, type: 'salary', payYear: 2026, total: 0, sevYears: 5, profile: blankProfile(),
+    refund: { inc106: null, tax106: null }, alloc: {}, data: {}, whMode: 'all', annualFull: false });
+  openGroups.clear();
+  for (const el of document.querySelectorAll('input')) {
+    if (el.type === 'radio') el.checked = el.name === 'whMode' && el.value === 'all';
+    else if (el.type === 'checkbox') el.checked = el.id === 'resident' || el.id === 'fullService';
+    else el.value = '';
+  }
+  $('gender').value = 'M'; $('childTable').value = 'B'; $('eduTrack').value = '';
+  $('payType').value = 'salary'; $('sevYears').value = '5';
+  yearOptions($('payYear'), state.payYear);
+  for (const d of document.querySelectorAll('details')) d.open = false;
+  $('pdfMsg').textContent = '';
+  renderKids(); renderDegrees(); renderCounts();
+  applyType();
+  go(1);
+}
+$('resetBtn').addEventListener('click', () => {
+  if (confirm('למחוק את כל הנתונים ולהתחיל מההתחלה?')) resetAll();
+});
+
+// ---- init ----
 yearOptions($('payYear'), state.payYear);
 $('sevYears').value = String(state.sevYears);
 renderKids(); renderDegrees();
 applyType();
-split();
+go(1);
 </script>
 </body>
 </html>
