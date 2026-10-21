@@ -143,7 +143,9 @@ tr.payrow td{background:var(--accent-soft)}
 #sheet .adjt{width:auto;min-width:60%}
 #sheet .adjt td:first-child{font-weight:500}
 #sheet i.fill{display:inline-block;width:110px;border-bottom:1px solid #111;height:14px}
-#sheet .sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:30px}
+#sheet .topline{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:14px}
+#sheet .internal{border:1.5px solid #111;padding:3px 10px;font-weight:700;font-size:12px}
+#sheet .field.date i{flex:none;width:120px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -351,7 +353,7 @@ tr.payrow td{background:var(--accent-soft)}
       <label class="check"><input type="checkbox" id="annualFull"> חישוב המס הכולל לשנת הדוח (מקדמה, שיעור והשוואה למס ללא פריסה). דורש הזנת ההכנסות בשנת קבלת הכספים.</label>
       <div class="actions"><button id="pdfRefund" type="button" class="primary">PDF – דוח החזר מס</button></div>
     </div>
-    <p class="note">בכל קובץ PDF מופיעים רק נתוני החישוב. שם הנישום, ת"ז, המעסיק, התאריך והחתימה נשארים ריקים למילוי ידני.</p>
+    <p class="note">ה-PDF הוא מסמך פנימי, לא למסירה לנישום. מופיעים בו רק נתוני החישוב; ת"ז, תיק ניכויים, המעסיק, התאריך ו"הוכן על ידי" נשארים ריקים למילוי ידני.</p>
     <span id="pdfMsg" role="status" class="note"></span>
     <div class="nav"><button type="button" data-prev>→ הקודם</button><span class="grow"></span></div>
   </section>
@@ -385,7 +387,7 @@ const blankProfile = () => ({ gender: 'M', childTable: 'B', resident: true, sing
 const state = {
   step: 1,
   mode: null,  // 'coord' (tax coordination, 2026) | 'annual' (annual report, 2020-2025)
-  type: 'salary', payYear: 2026, total: 0, sevYears: 5,
+  type: 'salary', payYear: 2026, total: 0, sevYears: 5, townStill: true,
   profile: blankProfile(),
   refund: { inc106: null, tax106: null },
   alloc: {},   // year -> amount
@@ -410,24 +412,44 @@ function pointsFor(y) {
 // year has a manual rate and ceiling.
 const TOWNS = window.TOWNS || {};
 const MONTH_NAMES = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
-function townParts(y) {
-  const t = state.town && TOWNS[state.town];
-  if (!t) return null;
-  return (state.townNew && t.n && t.n[y]) || t.y[y] || [];
+const townKnown = () => !!TOWNS[state.town];
+const townHasNew = () => { const t = TOWNS[state.town]; return !!(t && t.n && creditYears().some(y => t.n[y])); };
+// Months (1-12) of year y lived in the town, from the residence dates (YYYY-MM). No start date = all months.
+function residentMonths(y) {
+  const k = v => { const [yy, mm] = v.split('-').map(Number); return yy * 12 + mm; };
+  const from = state.townFrom ? k(state.townFrom) : -Infinity, to = !state.townStill && state.townTo ? k(state.townTo) : Infinity;
+  const out = [];
+  for (let m = 1; m <= 12; m++) if (y * 12 + m >= from && y * 12 + m <= to) out.push(m);
+  return out;
 }
-const townHasNew = () => { const t = state.town && TOWNS[state.town]; return !!(t && t.n && creditYears().some(y => t.n[y])); };
-function townLim(y) {
-  const parts = townParts(y);
-  if (!parts) return '';
-  if (!parts.length) return `<span class="v">לא ברשימת היישובים המוטבים ב-${y}${state.townNew && TOWNS[state.town].y[y] ? ' לתושב מ-2019 ואילך' : ''}</span>`;
-  if (parts.length === 1 && parts[0][0] === 12) return `לפי הלוח: ${parts[0][1]}% עד ${fmt(parts[0][2])}`;
-  let from = 1;
-  const txt = parts.map(([m, r, c]) => { const t = `${MONTH_NAMES[from]}–${MONTH_NAMES[from + m - 1]}: ${r}% עד ${fmt(c)}`; from += m; return t; }).join(' · ');
-  return `לפי הלוח: ${txt}${from <= 12 ? ' (שאר השנה – ללא הטבה)' : ''}`;
+// Town from the booklet list: each period of the year counts only the months lived there.
+function townParts(y) {
+  const t = TOWNS[state.town];
+  if (!t) return null;
+  const res = residentMonths(y);
+  let start = 1;
+  return ((state.townNew && t.n && t.n[y]) || t.y[y] || []).map(([m, r, c]) => {
+    const n = res.filter(x => x >= start && x < start + m).length; start += m; return [n, r, c];
+  }).filter(p => p[0] > 0);
 }
 function creditsFor(y) {
-  const cr = yd(y).cr, parts = townParts(y);
-  return E.shekelCredits(y, yd(y).base || 0, parts ? { ...cr, settleParts: parts } : cr);
+  const cr = { ...yd(y).cr };
+  delete cr.settleMonths;
+  if (townKnown()) { delete cr.settleRate; delete cr.settleCeil; cr.settleParts = townParts(y); }
+  else if (state.townText) cr.settleMonths = residentMonths(y).length;   // town not in the lists: manual rate and ceiling
+  else { delete cr.settleRate; delete cr.settleCeil; }
+  return E.shekelCredits(y, yd(y).base || 0, cr);
+}
+function settleInfo() {
+  const t = TOWNS[state.town];
+  if (!state.townText) return '';
+  const ys = creditYears();
+  const parts = ys.map(y => {
+    if (t && !((state.townNew && t.n && t.n[y]) || t.y[y] || []).length) return `${y}: לא ברשימת היישובים המוטבים${state.townNew && t.y[y] ? ' לתושב מ-2019 ואילך' : ''}`;
+    const n = residentMonths(y).length;
+    return `${y}: ${n === 12 ? 'שנה מלאה' : n ? n + ' חודשים' : 'לא גר ביישוב'}`;
+  });
+  return 'חודשי מגורים: ' + parts.join(' · ');
 }
 
 // "Brackets only": prior years are taxed by the brackets alone, without credit points or credits.
@@ -524,23 +546,28 @@ function renderDegrees() {
 // Shekel credits: one collapsible row per kind, each with a small table by year.
 const P_ = y => E.CREDIT_PARAMS[y] || {};
 const CREDIT_GROUPS = [
-  { id: 'settle', title: 'אישור תושב – יישוב מזכה', copy: ['settleRate', 'settleCeil', 'settleMonths'],
-    cols: [['settleRate', 'שיעור (%)', 'decimal'], ['settleCeil', 'תקרת הכנסה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים', 'numeric', '12']],
-    lim: townLim,
+  { id: 'settle', title: 'אישור תושב – יישוב מזכה', copy: ['settleRate', 'settleCeil'],
+    cols: [['settleRate', 'שיעור (%)', 'decimal'], ['settleCeil', 'תקרת הכנסה (₪)', 'numeric']],
     head: () => `<div class="row">
-      <label style="flex:0 1 280px">יישוב (לפי אישור התושב)<input id="town" list="townList" autocomplete="off" placeholder="הקלידו שם יישוב" value="${esc(state.town || state.townText || '')}"></label>
+      <label style="flex:0 1 260px">יישוב (לפי אישור התושב)<input id="town" list="townList" autocomplete="off" placeholder="הקלידו שם יישוב" value="${esc(state.townText || '')}"></label>
+      <label>תחילת מגורים<input type="month" id="townFrom" min="1990-01" max="2026-12" value="${state.townFrom || ''}"></label>
+      <label>סיום מגורים<input type="month" id="townTo" min="1990-01" max="2026-12" value="${state.townTo || ''}"${state.townStill ? ' disabled' : ''}></label>
+      <label class="check" style="flex:0 1 auto"><input type="checkbox" id="townStill"${state.townStill ? ' checked' : ''}> עדיין גר ביישוב</label>
       <label class="check" id="townNewWrap" style="flex:0 1 auto"${townHasNew() ? '' : ' hidden'}><input type="checkbox" id="townNew"${state.townNew ? ' checked' : ''}> תושב היישוב מ-2019 ואילך</label>
     </div>
-    <p class="note" id="townMsg" hidden></p>`,
-    note: 'בוחרים יישוב, והשיעור והתקרה של כל שנה נלקחים מלוח הניכויים של אותה שנה. בשנה שבה השיעור או התקרה השתנו באמצע השנה, כל תקופה מחושבת לפי מספר החודשים שלה. אפשר להזין שיעור ותקרה ידנית לשנה מסוימת, והם גוברים על הלוח. הזיכוי = שיעור × ההכנסה עד התקרה × חודשי המגורים / 12.' },
+    <p class="note" id="townMsg"${state.townText && !townKnown() ? '' : ' hidden'}>היישוב לא נמצא ברשימות 2020–2026. הזינו למטה את השיעור והתקרה לכל שנה לפי אישור התושב.</p>
+    <p class="note" id="settleInfo">${settleInfo()}</p>`,
+    note: 'בוחרים יישוב ומזינים את תקופת המגורים (חודש ושנה). הזיכוי נלקח מלוח הניכויים של כל שנה, לפי החודשים שבהם הנישום גר ביישוב. בלי תאריך תחילה, כל השנים נחשבות שנות מגורים מלאות.',
+    manual: true },
   { id: 'eilat', title: 'אילת', copy: ['eilatIncome'], cols: [['eilatIncome', 'הכנסה שהופקה באילת (₪)', 'numeric']],
     lim: y => `תקרה ${fmt(P_(y).eilatCeil)}`, note: 'זיכוי של 10% מההכנסה שהופקה באילת, עד התקרה השנתית.' },
   { id: 'pension', title: 'פנסיה וביטוח חיים', cols: [['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric']],
     note: 'פנסיה 35%, ביטוח חיים 25% מהסכום המזכה.' },
   { id: 'donation', title: 'תרומות', cols: [['donation', 'סכום התרומות (₪)', 'numeric']],
     lim: y => `מינימום ${fmt(P_(y).donationMin)}${(P_(y).assumed || []).includes('donationMin') ? ' (הנחה)' : ''}`, note: '35% מהתרומות שמעל המינימום, ועד 30% מההכנסה החייבת.' },
-  { id: 'shift', title: 'עבודה במשמרות בתעשייה', cols: [['shiftWage', 'שכר משמרות (₪)', 'numeric']],
-    lim: y => `תקרת הכנסה ${fmt(P_(y).shiftCeil)} · זיכוי עד ${fmt(P_(y).shiftMax)}`, note: '15% משכר המשמרות, בתוך תקרת ההכנסה השנתית.' },
+  { id: 'shift', title: 'עבודה במשמרות בתעשייה', cols: [['shiftWage', 'שכר משמרות (כלול בהכנסה) (₪)', 'numeric']],
+    lim: y => `תקרת הכנסה ${fmt(P_(y).shiftCeil)} · זיכוי עד ${fmt(P_(y).shiftMax)}`,
+    note: 'זיכוי מתקפל: 15% מהחלק של שכר המשמרות שנשאר מתחת לתקרת ההכנסה אחרי צירוף שאר ההכנסה של אותה שנה. ככל שההכנסה הכוללת גבוהה יותר, הזיכוי קטן, ומעל התקרה הוא מתאפס. דוגמה 2024: משמרות 30,000 ושאר הכנסה 120,000 – זיכוי 3,456; שאר הכנסה 140,000 – זיכוי 456.' },
   { id: 'soldier', title: 'חייל במשכורת מיוחדת', cols: [['soldierSalary', 'משכורת מיוחדת (₪)', 'numeric']],
     lim: y => `תקרה ${fmt(P_(y).soldierCeil)}`, note: '5% עד התקרה. הזיכוי ניתן במקום יישוב מזכה – נלקח הגבוה מביניהם.' },
   { id: 'other', title: 'זיכוי אחר', cols: [['other', 'זיכוי בשקלים (₪)', 'numeric']], note: 'זיכוי בשקלים שלא מופיע ברשימה, כפי שהוא.' },
@@ -548,26 +575,22 @@ const CREDIT_GROUPS = [
 const openGroups = new Set();
 function groupCount(g) {
   const n = creditYears().filter(y => g.cols.some(([k]) => yd(y).cr[k] != null)).length;
-  if (g.id === 'settle' && TOWNS[state.town]) return `(${state.town})`;
+  if (g.id === 'settle') return state.townText ? `(${state.townText})` : '';
   return n ? `(${n === 1 ? 'שנה אחת' : n + ' שנים'})` : '';
-}
-// Placeholder for the town's rate and ceiling when the year has a single full-year entry in the list.
-function townPlaceholder(k, y) {
-  const parts = (k === 'settleRate' || k === 'settleCeil') && townParts(y);
-  if (!parts) return null;
-  if (parts.length === 1 && parts[0][0] === 12) return k === 'settleRate' ? String(parts[0][1]) : fmt(parts[0][2]);
-  return parts.length ? 'מהלוח' : '—';
 }
 function groupRows(g, ys) {
   return ys.map(y => `<tr><td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>${g.cols.map(([k, , mode, ph]) => {
     const v = yd(y).cr[k];
-    return `<td><input class="num" id="cr${k}${y}" data-c="${k}" data-y="${y}" inputmode="${mode}" value="${v == null ? '' : (mode === 'numeric' ? fmt(v) : v)}" placeholder="${townPlaceholder(k, y) ?? ph ?? '0'}"></td>`;
+    return `<td><input class="num" id="cr${k}${y}" data-c="${k}" data-y="${y}" inputmode="${mode}" value="${v == null ? '' : (mode === 'numeric' ? fmt(v) : v)}" placeholder="${ph || '0'}"></td>`;
   }).join('')}${g.lim ? `<td class="lim">${g.lim(y)}</td>` : ''}</tr>`).join('');
 }
 function refreshSettle() {
-  const g = CREDIT_GROUPS[0], body = document.querySelector('#cg-settle tbody');
-  if (body) body.innerHTML = groupRows(g, creditYears());
-  const wrap = $('townNewWrap'); if (wrap) wrap.hidden = !townHasNew();
+  if (!$('town')) return;
+  $('townNewWrap').hidden = !townHasNew();
+  $('townMsg').hidden = !(state.townText && !townKnown());
+  $('gt-settle').hidden = !(state.townText && !townKnown());
+  $('townTo').disabled = !!state.townStill;
+  $('settleInfo').textContent = settleInfo();
 }
 function renderCreditGroups() {
   const ys = creditYears();
@@ -575,11 +598,13 @@ function renderCreditGroups() {
     <summary>${g.title} <span class="cnt" data-cnt="${g.id}">${groupCount(g)}</span></summary>
     ${g.head ? g.head() : ''}
     <p class="note">${g.note}</p>
+    <div id="gt-${g.id}"${g.manual && !(state.townText && !townKnown()) ? ' hidden' : ''}>
     <div class="scroll"><table class="ytable">
       <thead><tr><th>שנת מס</th>${g.cols.map(c => `<th>${c[1]}</th>`).join('')}${g.lim ? '<th></th>' : ''}</tr></thead>
       <tbody>${groupRows(g, ys)}</tbody>
     </table></div>
     ${g.copy && ys.length > 1 ? `<div><button type="button" class="ghost" data-crcopy="${g.id}">העתק את השורה של ${ys[0]} לכל השנים</button></div>` : ''}
+    </div>
   </details>`).join('');
 }
 
@@ -761,14 +786,9 @@ document.addEventListener('input', e => {
   if (['eduTrack', 'gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'reserve2025', 'alimonyFrom', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     readProfile(t.id === 'gender'); renderPointsOnly(); return;
   }
-  if (t.id === 'town') {
-    const v = t.value.trim();
-    state.townText = v;
-    state.town = TOWNS[v] ? v : null;
-    $('townMsg').hidden = !v || !!state.town;
-    $('townMsg').textContent = 'היישוב לא נמצא ברשימות 2020–2026. בחרו מהרשימה, או הזינו שיעור ותקרה ידנית לכל שנה.';
-    refreshSettle(); calc(); return;
-  }
+  if (t.id === 'town') { const v = t.value.trim(); state.townText = v; state.town = TOWNS[v] ? v : null; refreshSettle(); calc(); return; }
+  if (t.id === 'townFrom' || t.id === 'townTo') { state[t.id] = t.value; refreshSettle(); calc(); return; }
+  if (t.id === 'townStill') { state.townStill = t.checked; refreshSettle(); calc(); return; }
   if (t.id === 'townNew') { state.townNew = t.checked; refreshSettle(); calc(); return; }
   if (t.dataset.c) {
     const y = +t.dataset.y;
@@ -851,7 +871,9 @@ $('splitBtn').addEventListener('click', split);
 // ---- PDF ----
 const TYPE_LABEL = { salary: 'הפרשי שכר', severance: 'פיצויים / מענק פרישה (החלק החייב)', other: 'הכנסה חד-פעמית אחרת' };
 const blank = t => `<div class="field"><span>${t}:</span><i></i></div>`;
-const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה.';
+// Internal Tax Authority document: no taxpayer name or signatures; a short date line at the top left.
+const TOPLINE = '<div class="topline"><div class="internal">מסמך פנימי – לשימוש פנימי בלבד, לא למסירה לנישום</div><div class="field date"><span>תאריך:</span><i></i></div></div>';
+const FOOT = 'החישוב לפי מדרגות המס השנתיות ושווי נקודת הזיכוי בכל שנת מס, על הכנסה מיגיעה אישית, כולל מס יסף. המס לכל שנה הוא ההפרש בין המס על ההכנסה החייבת בתוספת הסכום המיוחס לבין המס על ההכנסה החייבת בלבד, אחרי נקודות זיכוי וזיכויים. החישוב נומינלי, ואינו כולל הפרשי הצמדה וריבית, ביטוח לאומי ומס בריאות. החישוב אינו מהווה אישור של פקיד השומה. מסמך פנימי – לא למסירה לנישום.';
 
 function yearsTable(lines, totalLabel) {
   const inc = lines.reduce((s, l) => s + l.alloc, 0), tax = lines.reduce((s, l) => s + l.add, 0);
@@ -888,12 +910,12 @@ function buildRefundSheet() {
   const prev = r.lines.filter(l => l.year < state.payYear), cur = r.lines.find(l => l.year === state.payYear);
   const opt = v => v == null ? '<i class="fill"></i>' : fmt(v);
   $('sheet').innerHTML = `
+    ${TOPLINE}
     <h1>ייחוס הכנסה לשנים קודמות – נתונים לדוח החזר מס</h1>
     <div class="subt">${TYPE_LABEL[state.type]} · שנת הדוח ${state.payYear}</div>
     <div class="fields">
-      ${blank('שם הנישום')}${blank('מספר זהות')}
-      ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
-      ${blank('תאריך')}${blank('הוכן על ידי')}
+      ${blank('מספר זהות')}${blank('תיק ניכויים')}
+      ${blank('שם המעסיק / המשלם')}${blank('הוכן על ידי')}
     </div>
     <h3>נתוני התשלום</h3>
     <div class="kv">
@@ -921,8 +943,7 @@ function buildRefundSheet() {
       </tbody>
       <tfoot><tr><td>לדיווח בשנת הדוח</td><td>${opt(adj.income)}</td><td>${opt(adj.tax)}</td></tr></tfoot>
     </table>
-    <div class="foot">${FOOT}</div>
-    <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
+    <div class="foot">${FOOT}</div>`;
   return `פריסה-דוח-החזר-${state.payYear}.pdf`;
 }
 
@@ -930,12 +951,12 @@ function buildCertSheet() {
   const { input, r } = calc();
   const ys = r.lines.map(l => l.year);
   $('sheet').innerHTML = `
+    ${TOPLINE}
     <h1>אישור תיאום מס – פריסת הכנסה</h1>
     <div class="subt">${TYPE_LABEL[state.type]} · שנת המס ${state.payYear}</div>
     <div class="fields">
-      ${blank('שם הנישום')}${blank('מספר זהות')}
-      ${blank('שם המעסיק / המשלם')}${blank('תיק ניכויים')}
-      ${blank('תאריך')}${blank('הוכן על ידי')}
+      ${blank('מספר זהות')}${blank('תיק ניכויים')}
+      ${blank('שם המעסיק / המשלם')}${blank('הוכן על ידי')}
     </div>
     <h3>פרטי הפריסה</h3>
     <div class="kv">
@@ -962,8 +983,7 @@ function buildCertSheet() {
     ${r.forcedCredit < 0 ? '<div class="foot">המס לפי הפריסה גבוה מהמס בלי פריסה. אין זיכוי מאולץ.</div>' : ''}
     <h3>פירוט לפי שנים (₪)</h3>
     ${yearsTable(r.lines, 'סה"כ')}
-    <div class="foot">${FOOT}</div>
-    <div class="sign">${blank('חתימת הנישום')}${blank('חתימה וחותמת')}</div>`;
+    <div class="foot">${FOOT}</div>`;
   return `אישור-תיאום-מס-${state.payYear}.pdf`;
 }
 
@@ -1010,7 +1030,7 @@ for (const id of ['modeCoord', 'modeAnnual']) $(id).addEventListener('change', e
 function resetAll() {
   Object.assign(state, { step: 1, mode: null, type: 'salary', payYear: 2026, total: 0, sevYears: 5, profile: blankProfile(),
     refund: { inc106: null, tax106: null }, alloc: {}, data: {}, whMode: 'all', annualFull: false });
-  openGroups.clear(); state.town = null; state.townText = ''; state.townNew = false;
+  openGroups.clear(); state.town = null; state.townText = ''; state.townNew = false; state.townFrom = ''; state.townTo = ''; state.townStill = true;
   for (const el of document.querySelectorAll('input')) {
     if (el.type === 'radio') el.checked = el.name === 'whMode' && el.value === 'all';
     else if (el.type === 'checkbox') el.checked = el.id === 'resident' || el.id === 'fullService';
