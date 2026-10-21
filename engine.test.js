@@ -257,7 +257,7 @@ test('donation minimum 2020-2021 is 190', () => {
 
 test('special-salary soldier: 5% up to ceiling, better of soldier / qualifying town', () => {
   near(E.shekelCredits(2024, 200000, { soldierSalary: 200000 }).total, 0.05 * 178320);
-  near(E.shekelCredits(2020, 200000, { soldierSalary: 200000 }).total, 8028);   // 5% x 160,560
+  near(E.shekelCredits(2020, 200000, { soldierSalary: 200000 }).total, 8052);   // 5% x 161,040 (January 2020 booklet)
   near(E.shekelCredits(2021, 200000, { soldierSalary: 200000 }).total, 8004);   // 5% x 160,080
   near(E.shekelCredits(2026, 200000, { soldierSalary: 200000 }).total, 8916);   // 5% x 178,320
   // town 7% x 146,642 = 10,264.94 > soldier 8,916 -> town kept
@@ -348,4 +348,28 @@ test('education combination rules', () => {
 test('special-salary soldier ceilings 2022-2023', () => {
   near(E.shekelCredits(2022, 200000, { soldierSalary: 200000 }).total, 8196);
   near(E.shekelCredits(2023, 200000, { soldierSalary: 200000 }).total, 8628);
+});
+
+test('qualifying town from the booklets: periods weighted by months', () => {
+  const T = require('./towns.js');
+  // Avivim 2020 (entitled before 2019): Jan-Jun 14% up to 216,600, Jul-Dec 14% up to 198,600
+  assert.deepEqual(T['אביבים'].y['2020'], [[6, 14, 216600], [6, 14, 198600]]);
+  assert.deepEqual(T['אביבים'].n['2020'], [[12, 14, 198600]]);   // resident from 2019 on: second period all year
+  near(E.shekelCredits(2020, 300000, { settleParts: T['אביבים'].y['2020'] }).total, 0.14 * 216600 / 2 + 0.14 * 198600 / 2);
+  near(E.shekelCredits(2020, 300000, { settleParts: T['אביבים'].y['2020'], settleMonths: 6 }).total, (0.14 * 216600 / 2 + 0.14 * 198600 / 2) / 2);
+  // Sderot 2024: 20% up to 267,840; income below the ceiling
+  near(E.shekelCredits(2024, 150000, { settleParts: T['שדרות'].y['2024'] }).total, 30000);
+  // Tiberias 2023 (amendment 256): Jan-Feb 12% up to 180,000, Mar-Dec 10% up to 174,120
+  near(E.shekelCredits(2023, 200000, { settleParts: T['טבריה'].y['2023'] }).total, 0.12 * 180000 * 2 / 12 + 0.10 * 174120 * 10 / 12);
+  // group 1 in 2020: first half only; nothing for a resident from 2019 on
+  assert.deepEqual(T['אלמוג'].y['2020'], [[6, 7, 132360]]);
+  assert.deepEqual(T['אלמוג'].n['2020'], []);
+  // manual rate and ceiling win over the list
+  near(E.shekelCredits(2024, 150000, { settleParts: T['שדרות'].y['2024'], settleRate: 10, settleCeil: 100000 }).total, 10000);
+});
+
+test('booklet parameters 2025-2026: donation minimum confirmed (no longer assumed)', () => {
+  assert.equal(E.CREDIT_PARAMS[2025].donationMin, 207);
+  assert.equal(E.CREDIT_PARAMS[2026].assumed, undefined);
+  assert.equal(E.CREDIT_PARAMS[2020].soldierCeil, 161040);
 });

@@ -103,7 +103,8 @@ details.sub>div,details.sub>p{margin-block:6px}
 .list .item>label{flex:0 1 150px}
 .ytable{width:auto}
 .ytable td input{width:150px;min-width:0}
-.ytable td.lim{font-size:.8rem;color:var(--muted)}
+.ytable td.lim{font-size:.8rem;color:var(--muted);white-space:normal;min-width:220px}
+.lim .v{color:var(--warn)}
 .whlist{display:flex;flex-wrap:wrap;gap:8px 18px}
 .ptsum td input{width:90px;min-width:0}
 tr.payrow td{background:var(--accent-soft)}
@@ -356,11 +357,13 @@ tr.payrow td{background:var(--accent-soft)}
   </section>
 </div>
 
+<datalist id="townList"></datalist>
 <div id="sheet" aria-hidden="true"></div>
 
 <script src="lib/html2canvas.min.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="engine.js"></script>
+<script src="towns.js"></script>
 <script>
 const E = window.TaxEngine;
 const $ = id => document.getElementById(id);
@@ -403,7 +406,29 @@ function pointsFor(y) {
   return { auto, value: o == null ? auto.total : o, overridden: o != null };
 }
 
-function creditsFor(y) { return E.shekelCredits(y, yd(y).base || 0, yd(y).cr); }
+// Qualifying town picked from the booklet lists: its periods for the year feed the credit, unless the
+// year has a manual rate and ceiling.
+const TOWNS = window.TOWNS || {};
+const MONTH_NAMES = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+function townParts(y) {
+  const t = state.town && TOWNS[state.town];
+  if (!t) return null;
+  return (state.townNew && t.n && t.n[y]) || t.y[y] || [];
+}
+const townHasNew = () => { const t = state.town && TOWNS[state.town]; return !!(t && t.n && creditYears().some(y => t.n[y])); };
+function townLim(y) {
+  const parts = townParts(y);
+  if (!parts) return '';
+  if (!parts.length) return `<span class="v">לא ברשימת היישובים המוטבים ב-${y}${state.townNew && TOWNS[state.town].y[y] ? ' לתושב מ-2019 ואילך' : ''}</span>`;
+  if (parts.length === 1 && parts[0][0] === 12) return `לפי הלוח: ${parts[0][1]}% עד ${fmt(parts[0][2])}`;
+  let from = 1;
+  const txt = parts.map(([m, r, c]) => { const t = `${MONTH_NAMES[from]}–${MONTH_NAMES[from + m - 1]}: ${r}% עד ${fmt(c)}`; from += m; return t; }).join(' · ');
+  return `לפי הלוח: ${txt}${from <= 12 ? ' (שאר השנה – ללא הטבה)' : ''}`;
+}
+function creditsFor(y) {
+  const cr = yd(y).cr, parts = townParts(y);
+  return E.shekelCredits(y, yd(y).base || 0, parts ? { ...cr, settleParts: parts } : cr);
+}
 
 // "Brackets only": prior years are taxed by the brackets alone, without credit points or credits.
 // The payment year always keeps its points and credits (as payroll computes it).
@@ -501,7 +526,13 @@ const P_ = y => E.CREDIT_PARAMS[y] || {};
 const CREDIT_GROUPS = [
   { id: 'settle', title: 'אישור תושב – יישוב מזכה', copy: ['settleRate', 'settleCeil', 'settleMonths'],
     cols: [['settleRate', 'שיעור (%)', 'decimal'], ['settleCeil', 'תקרת הכנסה (₪)', 'numeric'], ['settleMonths', 'חודשי מגורים', 'numeric', '12']],
-    note: 'לפי אישור התושב: שיעור הזיכוי ותקרת ההכנסה של היישוב באותה שנה. הזיכוי = שיעור × ההכנסה עד התקרה × חודשי המגורים / 12.' },
+    lim: townLim,
+    head: () => `<div class="row">
+      <label style="flex:0 1 280px">יישוב (לפי אישור התושב)<input id="town" list="townList" autocomplete="off" placeholder="הקלידו שם יישוב" value="${esc(state.town || state.townText || '')}"></label>
+      <label class="check" id="townNewWrap" style="flex:0 1 auto"${townHasNew() ? '' : ' hidden'}><input type="checkbox" id="townNew"${state.townNew ? ' checked' : ''}> תושב היישוב מ-2019 ואילך</label>
+    </div>
+    <p class="note" id="townMsg" hidden></p>`,
+    note: 'בוחרים יישוב, והשיעור והתקרה של כל שנה נלקחים מלוח הניכויים של אותה שנה. בשנה שבה השיעור או התקרה השתנו באמצע השנה, כל תקופה מחושבת לפי מספר החודשים שלה. אפשר להזין שיעור ותקרה ידנית לשנה מסוימת, והם גוברים על הלוח. הזיכוי = שיעור × ההכנסה עד התקרה × חודשי המגורים / 12.' },
   { id: 'eilat', title: 'אילת', copy: ['eilatIncome'], cols: [['eilatIncome', 'הכנסה שהופקה באילת (₪)', 'numeric']],
     lim: y => `תקרה ${fmt(P_(y).eilatCeil)}`, note: 'זיכוי של 10% מההכנסה שהופקה באילת, עד התקרה השנתית.' },
   { id: 'pension', title: 'פנסיה וביטוח חיים', cols: [['pension', 'פנסיה – סכום מזכה לפי 106 (₪)', 'numeric'], ['life', 'ביטוח חיים – סכום מזכה (₪)', 'numeric']],
@@ -517,19 +548,36 @@ const CREDIT_GROUPS = [
 const openGroups = new Set();
 function groupCount(g) {
   const n = creditYears().filter(y => g.cols.some(([k]) => yd(y).cr[k] != null)).length;
+  if (g.id === 'settle' && TOWNS[state.town]) return `(${state.town})`;
   return n ? `(${n === 1 ? 'שנה אחת' : n + ' שנים'})` : '';
+}
+// Placeholder for the town's rate and ceiling when the year has a single full-year entry in the list.
+function townPlaceholder(k, y) {
+  const parts = (k === 'settleRate' || k === 'settleCeil') && townParts(y);
+  if (!parts) return null;
+  if (parts.length === 1 && parts[0][0] === 12) return k === 'settleRate' ? String(parts[0][1]) : fmt(parts[0][2]);
+  return parts.length ? 'מהלוח' : '—';
+}
+function groupRows(g, ys) {
+  return ys.map(y => `<tr><td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>${g.cols.map(([k, , mode, ph]) => {
+    const v = yd(y).cr[k];
+    return `<td><input class="num" id="cr${k}${y}" data-c="${k}" data-y="${y}" inputmode="${mode}" value="${v == null ? '' : (mode === 'numeric' ? fmt(v) : v)}" placeholder="${townPlaceholder(k, y) ?? ph ?? '0'}"></td>`;
+  }).join('')}${g.lim ? `<td class="lim">${g.lim(y)}</td>` : ''}</tr>`).join('');
+}
+function refreshSettle() {
+  const g = CREDIT_GROUPS[0], body = document.querySelector('#cg-settle tbody');
+  if (body) body.innerHTML = groupRows(g, creditYears());
+  const wrap = $('townNewWrap'); if (wrap) wrap.hidden = !townHasNew();
 }
 function renderCreditGroups() {
   const ys = creditYears();
   $('creditGroups').innerHTML = CREDIT_GROUPS.map(g => `<details class="sub" id="cg-${g.id}"${openGroups.has(g.id) ? ' open' : ''}>
     <summary>${g.title} <span class="cnt" data-cnt="${g.id}">${groupCount(g)}</span></summary>
+    ${g.head ? g.head() : ''}
     <p class="note">${g.note}</p>
     <div class="scroll"><table class="ytable">
       <thead><tr><th>שנת מס</th>${g.cols.map(c => `<th>${c[1]}</th>`).join('')}${g.lim ? '<th></th>' : ''}</tr></thead>
-      <tbody>${ys.map(y => `<tr><td>${y}${y === state.payYear ? '<span class="tag">שנת התשלום</span>' : ''}</td>${g.cols.map(([k, , mode, ph]) => {
-        const v = yd(y).cr[k];
-        return `<td><input class="num" id="cr${k}${y}" data-c="${k}" data-y="${y}" inputmode="${mode}" value="${v == null ? '' : (mode === 'numeric' ? fmt(v) : v)}" placeholder="${ph || '0'}"></td>`;
-      }).join('')}${g.lim ? `<td class="lim">${g.lim(y)}</td>` : ''}</tr>`).join('')}</tbody>
+      <tbody>${groupRows(g, ys)}</tbody>
     </table></div>
     ${g.copy && ys.length > 1 ? `<div><button type="button" class="ghost" data-crcopy="${g.id}">העתק את השורה של ${ys[0]} לכל השנים</button></div>` : ''}
   </details>`).join('');
@@ -713,6 +761,15 @@ document.addEventListener('input', e => {
   if (['eduTrack', 'gender', 'childTable', 'resident', 'singleParent', 'loneParent', 'reserve2025', 'alimonyFrom', 'immigrant', 'discharge', 'fullService'].includes(t.id)) {
     readProfile(t.id === 'gender'); renderPointsOnly(); return;
   }
+  if (t.id === 'town') {
+    const v = t.value.trim();
+    state.townText = v;
+    state.town = TOWNS[v] ? v : null;
+    $('townMsg').hidden = !v || !!state.town;
+    $('townMsg').textContent = 'היישוב לא נמצא ברשימות 2020–2026. בחרו מהרשימה, או הזינו שיעור ותקרה ידנית לכל שנה.';
+    refreshSettle(); calc(); return;
+  }
+  if (t.id === 'townNew') { state.townNew = t.checked; refreshSettle(); calc(); return; }
   if (t.dataset.c) {
     const y = +t.dataset.y;
     const v = t.value.trim() === '' ? null : num(t.value);
@@ -953,7 +1010,7 @@ for (const id of ['modeCoord', 'modeAnnual']) $(id).addEventListener('change', e
 function resetAll() {
   Object.assign(state, { step: 1, mode: null, type: 'salary', payYear: 2026, total: 0, sevYears: 5, profile: blankProfile(),
     refund: { inc106: null, tax106: null }, alloc: {}, data: {}, whMode: 'all', annualFull: false });
-  openGroups.clear();
+  openGroups.clear(); state.town = null; state.townText = ''; state.townNew = false;
   for (const el of document.querySelectorAll('input')) {
     if (el.type === 'radio') el.checked = el.name === 'whMode' && el.value === 'all';
     else if (el.type === 'checkbox') el.checked = el.id === 'resident' || el.id === 'fullService';
@@ -973,6 +1030,7 @@ $('resetBtn').addEventListener('click', () => {
 });
 
 // ---- init ----
+$('townList').innerHTML = Object.keys(TOWNS).sort((a, b) => a.localeCompare(b, 'he')).map(n => `<option value="${esc(n)}">`).join('');
 yearOptions($('payYear'), state.payYear);
 $('sevYears').value = String(state.sevYears);
 renderKids(); renderDegrees();

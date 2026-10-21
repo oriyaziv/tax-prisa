@@ -174,18 +174,19 @@
 
   // ---------- Shekel credits (fixed per year, computed on the regular income) ----------
   // Sources: "ניתוב שלב א'" 2023-2025 and the credits training booklet in the team knowledge base.
-  // null = not in the material (no limit applied). `assumed` = 2026 frozen at 2025 values.
+  // null = not in the material (no limit applied). Checked against the monthly deduction booklets 2020-2026.
   const CREDIT_PARAMS = {
-    2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: 160560 },
+    2020: { eilatCeil: 242520, donationMin: 190, shiftMax: 11340, shiftCeil: 129120, soldierCeil: 161040 },
     2021: { eilatCeil: 241080, donationMin: 190, shiftMax: 11280, shiftCeil: 128400, soldierCeil: 160080 },
     2022: { eilatCeil: 246840, donationMin: 190, shiftMax: 11520, shiftCeil: 131520, soldierCeil: 163920 },
     2023: { eilatCeil: 259800, donationMin: 200, shiftMax: 12120, shiftCeil: 138480, soldierCeil: 172560 },
     2024: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
-    2025: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
-    2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320, assumed: ['donationMin'] },
+    2025: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
+    2026: { eilatCeil: 268560, donationMin: 207, shiftMax: 12540, shiftCeil: 143040, soldierCeil: 178320 },
   };
 
-  // cr: { settleRate (%), settleCeil, settleMonths, eilatIncome, pension, life, donation, shiftWage,\n  //       soldierSalary, soldierCeil (only where the year has no ceiling in the material), other }
+  // cr: { settleRate (%), settleCeil, settleMonths, settleParts ([months, rate %, ceiling] per period of the
+  //       town's list, used when no manual rate and ceiling are given), eilatIncome, pension, life, donation, shiftWage,\n  //       soldierSalary, soldierCeil (only where the year has no ceiling in the material), other }
   function shekelCredits(year, income, cr) {
     cr = cr || {};
     const P = CREDIT_PARAMS[year] || {}, assumed = P.assumed || [];
@@ -193,9 +194,13 @@
     const add = (label, amount, verify) => { if (amount > 0) items.push({ label, amount, verify: !!verify }); };
     const inc = Math.max(0, income || 0);
     // Qualifying town (סעיף 11): rate × min(income, ceiling), proportional to months of residence.
+    // A town whose rate or ceiling changed during the year has one part per period, weighted by its months.
+    const months = cr.settleMonths == null ? 12 : Math.max(0, Math.min(12, cr.settleMonths));
     if (cr.settleRate && cr.settleCeil) {
-      const m = cr.settleMonths == null ? 12 : Math.max(0, Math.min(12, cr.settleMonths));
-      add('יישוב מזכה', cr.settleRate / 100 * Math.min(inc, cr.settleCeil) * m / 12);
+      add('יישוב מזכה', cr.settleRate / 100 * Math.min(inc, cr.settleCeil) * months / 12);
+    } else if (cr.settleParts && cr.settleParts.length) {
+      const full = cr.settleParts.reduce((s, [m, rate, ceil]) => s + rate / 100 * Math.min(inc, ceil) * m / 12, 0);
+      add('יישוב מזכה', full * months / 12);
     }
     // Soldier with a special salary (11(ג)): 5% up to the ceiling. The taxpayer chooses either this
     // or the qualifying-town credit, so only the larger of the two is kept.
